@@ -13,6 +13,8 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
+find_package(rosplane_msgs REQUIRED)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
 
 #####################
@@ -27,6 +29,19 @@ target_include_directories(rviz_publisher
 ament_target_dependencies(rviz_publisher rclcpp geometry_msgs visualization_msgs)
 install(
   TARGETS rviz_publisher
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(planner
+  src/planner_node.cpp
+  src/planner.cpp)
+target_include_directories(planner
+  PRIVATE
+    include/eyes-on-the-guys
+    ${EIGEN3_INCLUDE_DIRS})
+ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
+install(
+  TARGETS planner
   DESTINATION lib/${PROJECT_NAME}
 )
 
