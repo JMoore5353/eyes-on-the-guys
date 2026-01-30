@@ -4,22 +4,27 @@ project(eyes-on-the-guys)
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(visualization_msgs REQUIRED)
 
 
 #####################
 ##   EXECUTABLES   ##
 #####################
 add_executable(rviz_publisher
+  src/rviz_publisher_node.cpp
   src/rviz_publisher.cpp)
 target_include_directories(rviz_publisher
   PRIVATE
     include/eyes-on-the-guys)
-ament_target_dependencies(rviz_publisher rclcpp)
+ament_target_dependencies(rviz_publisher rclcpp geometry_msgs visualization_msgs)
 install(
   TARGETS rviz_publisher
   DESTINATION lib/${PROJECT_NAME}
@@ -32,6 +37,14 @@ install(
   PROGRAMS
     src/example.py
   DESTINATION lib/${PROJECT_NAME}
+)
+
+###################
+##   RESOURCES   ##
+###################
+install(
+  DIRECTORY resource launch
+  DESTINATION share/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
