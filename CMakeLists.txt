@@ -30,6 +30,18 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(guys
+  src/guys_node.cpp
+  src/guys.cpp)
+target_include_directories(guys
+  PRIVATE
+    include/eyes-on-the-guys)
+ament_target_dependencies(guys rclcpp geometry_msgs)
+install(
+  TARGETS guys
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ########################
 ##   PYTHON SCRIPTS   ##
 ########################
