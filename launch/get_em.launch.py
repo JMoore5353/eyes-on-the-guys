@@ -1,5 +1,6 @@
 import os
 import sys
+import launch.actions
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -8,11 +9,92 @@ from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
+    # Get package directories
+    rosplane_dir = get_package_share_directory('rosplane')
+    aircraft = "anaconda"  # Default aircraft
+
+    autopilot_params = os.path.join(
+        rosplane_dir,
+        'params',
+        aircraft + '_autopilot_params.yaml'
+    )
+    
+    estimator_params = os.path.join(
+        rosplane_dir,
+        'params',
+        'estimator.yaml'
+    )
+
+    # Eyes-on-the-guys nodes
     rviz_guys_publisher = Node(
         package="eyes-on-the-guys",
         executable="rviz_publisher",
         name="rviz_guys_publisher",
         output="screen",
+    )
+
+    guys_sim = Node(
+        package="eyes-on-the-guys",
+        executable="guys",
+        name="guy_sim",
+        output="screen",
+        parameters=[
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+        ],
+    )
+
+    planner = Node(
+        package="eyes-on-the-guys",
+        executable="planner",
+        name="planner",
+        output="screen",
+        parameters=[
+            autopilot_params,
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+        ]
+    )
+
+    # Rosplane nodes (without path_planner)
+    controller = Node(
+        package='rosplane',
+        executable='controller',
+        name='controller',
+        parameters=[
+            autopilot_params,
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+        ],
+        output='screen'
+    )
+
+    path_follower = Node(
+        package='rosplane',
+        executable='path_follower',
+        name='path_follower',
+        parameters=[
+            autopilot_params,
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+        ]
+    )
+
+    path_manager = Node(
+        package='rosplane',
+        executable='path_manager',
+        name='path_manager',
+        parameters=[
+            autopilot_params,
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+        ]
+    )
+
+    estimator = Node(
+        package='rosplane',
+        executable='estimator',
+        name='estimator',
+        output='screen',
+        parameters=[
+            estimator_params,
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+        ],
     )
 
     eyes_on_guys_package_share_location = get_package_share_directory(
@@ -36,4 +118,18 @@ def generate_launch_description():
         }.items(),
     )
 
-    return LaunchDescription([rviz_guys_publisher, simulator_launch_include])
+    return LaunchDescription([
+        launch.actions.DeclareLaunchArgument(
+            "use_sim_time",
+            default_value="false",
+            description="Whether or not to use the /clock topic in simulation to run timers."
+        ),
+        rviz_guys_publisher,
+        guys_sim,
+        planner,
+        controller,
+        path_follower,
+        path_manager,
+        estimator,
+        simulator_launch_include
+    ])
