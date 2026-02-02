@@ -20,18 +20,22 @@ Guys::Guys()
   names_ = {
     "Jacob",
     "Brandon",
+    "Ian",
+    "Josh",
     "Euler",
     "Gauss",
     "Cantor",
     "Fermat",
     "Riemann",
+    "Lebesque",
     "Turing",
     "Ramanujan",
     "Hilbert",
     "Pythagoras",
     "Kalman",
     "Bode",
-    "Nyquist"
+    "Nyquist",
+    "Laplace"
   };
   rng_ = std::mt19937(std::random_device{}());
   initialize_guys();
