@@ -14,6 +14,7 @@
   <depend>visualization_msgs</depend>
   <depend>rosplane_msgs</depend>
   <depend>eigen</depend>
+  <depend>gnuplot</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

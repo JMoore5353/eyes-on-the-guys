@@ -3,6 +3,9 @@
 
 #include <Eigen/Eigen>
 #include <cmath>
+#include <map>
+#include <vector>
+#include <matplot/matplot.h>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -37,6 +40,11 @@ private:
 
   std::map<std::string, geometry_msgs::msg::PoseStamped> guy_poses_;
 
+  // Target tracking
+  std::string current_target_guy_;
+  bool has_target_;
+  size_t current_guy_index_;
+
   // Callbacks
   void eyes_state_callback(const rosplane_msgs::msg::State & msg);
   void guy_pose_callback(const geometry_msgs::msg::PoseStamped & msg);
@@ -44,6 +52,9 @@ private:
 
   // Planning
   rosplane_msgs::msg::Waypoint compute_next_waypoint();
+  void select_new_target_guy();
+  double compute_horizontal_distance_to_target();
+  void plot_state();
 
   /**
    * @brief Computes the Dubins path length from current state to target position/heading.

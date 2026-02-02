@@ -16,6 +16,21 @@ find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 
+find_package(Matplot++ QUIET)
+if(NOT Matplot++_FOUND)
+  message(STATUS "Matplot++ not found, downloading via FetchContent")
+  include(FetchContent)
+  FetchContent_Declare(matplotplusplus
+    GIT_REPOSITORY https://github.com/alandefreitas/matplotplusplus
+    GIT_TAG origin/master)
+  
+  FetchContent_GetProperties(matplotplusplus)
+  if(NOT matplotplusplus_POPULATED)
+    FetchContent_Populate(matplotplusplus)
+    add_subdirectory(${matplotplusplus_SOURCE_DIR} ${matplotplusplus_BINARY_DIR} EXCLUDE_FROM_ALL)
+  endif()
+endif()
+
 
 #####################
 ##   EXECUTABLES   ##
@@ -51,6 +66,11 @@ target_include_directories(planner
   PRIVATE
     include/eyes-on-the-guys
     ${EIGEN3_INCLUDE_DIRS})
+if(Matplot++_FOUND)
+  target_link_libraries(planner Matplot++::matplot)
+else()
+  target_link_libraries(planner matplot)
+endif()
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
