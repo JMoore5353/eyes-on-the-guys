@@ -12,6 +12,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
@@ -38,7 +40,7 @@ add_executable(guys
 target_include_directories(guys
   PRIVATE
     include/eyes-on-the-guys)
-ament_target_dependencies(guys rclcpp geometry_msgs)
+ament_target_dependencies(guys rclcpp geometry_msgs std_msgs)
 install(
   TARGETS guys
   DESTINATION lib/${PROJECT_NAME}
@@ -54,6 +56,17 @@ target_include_directories(planner
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+add_executable(forward_search_solver
+  src/forward_search_solver.cpp)
+target_include_directories(forward_search_solver
+  PRIVATE
+    include/eyes-on-the-guys)
+ament_target_dependencies(forward_search_solver rclcpp geometry_msgs std_msgs std_srvs)
+install(
+  TARGETS forward_search_solver
   DESTINATION lib/${PROJECT_NAME}
 )
 
