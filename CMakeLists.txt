@@ -17,6 +17,7 @@ find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(rosidl_default_generators REQUIRED)
+find_package(GTest REQUIRED)
 
 find_package(Matplot++ QUIET)
 if(NOT Matplot++_FOUND)
@@ -25,7 +26,7 @@ if(NOT Matplot++_FOUND)
   FetchContent_Declare(matplotplusplus
     GIT_REPOSITORY https://github.com/alandefreitas/matplotplusplus
     GIT_TAG origin/master)
-  
+
   FetchContent_GetProperties(matplotplusplus)
   if(NOT matplotplusplus_POPULATED)
     FetchContent_Populate(matplotplusplus)
@@ -92,6 +93,25 @@ install(
 )
 
 ###################
+##   LIBRARIES   ##
+###################
+add_library(monte_carlo_tree_search
+  src/monte_carlo_tree_search.cpp)
+target_include_directories(monte_carlo_tree_search
+  PUBLIC
+    include/eyes-on-the-guys)
+target_link_libraries(monte_carlo_tree_search Eigen3::Eigen)
+
+########################
+##   PYTHON SCRIPTS   ##
+########################
+install(
+  PROGRAMS
+    src/example.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+###################
 ##   RESOURCES   ##
 ###################
 install(
@@ -109,6 +129,17 @@ if(BUILD_TESTING)
   # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
+
+  add_executable(unit_tests
+    test/monte_carlo_tree_search_test.cpp)
+  target_include_directories(unit_tests
+    PRIVATE
+      ${GTEST_INCLUDE_DIRS})
+  target_link_libraries(unit_tests
+    GTest::GTest
+    GTest::Main
+    monte_carlo_tree_search
+  )
 endif()
 
 ament_package()
