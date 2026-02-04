@@ -96,6 +96,7 @@ install(
 ##   LIBRARIES   ##
 ###################
 add_library(monte_carlo_tree_search
+  src/monte_carlo_node.cpp
   src/monte_carlo_tree_search.cpp)
 target_include_directories(monte_carlo_tree_search
   PUBLIC
@@ -131,6 +132,7 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 
   add_executable(unit_tests
+    test/monte_carlo_node_test.cpp
     test/monte_carlo_tree_search_test.cpp)
   target_include_directories(unit_tests
     PRIVATE

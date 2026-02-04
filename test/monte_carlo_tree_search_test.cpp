@@ -1,28 +1,18 @@
 #include <Eigen/Core>
 #include <gtest/gtest.h>
+#include <memory>
 
+#include "monte_carlo_node.hpp"
 #include "monte_carlo_tree_search.hpp"
 
-TEST(ucb1, GivenZeroN_ExpectInfinity)
+TEST(find_greedy_action, WhenFindingGreedyAction_ExpectTheNodesGreedyAction)
 {
-  int action{0};
-  double exploration_bonus{1.0};
-  Eigen::Vector3i N_s_a{Eigen::Vector3i::Zero()};
-  Eigen::Vector3d Q_s_a{Eigen::Vector3d::Zero()};
+  auto node = std::make_shared<eyes_on_guys::Node>(0, 10, 1.0);
+  int node_greedy_action = node->explore_best_action();
 
-  double result = eyes_on_guys::get_ucb1_bound(action, exploration_bonus, N_s_a, Q_s_a);
+  int greedy_action = find_greedy_action(node);
 
-  EXPECT_EQ(result, std::numeric_limits<double>::infinity());
+  EXPECT_EQ(greedy_action, node_greedy_action);
 }
 
-TEST(ucb1, GivenOutOfBoundsIndex_ExpectLowest)
-{
-  int action{4};
-  double exploration_bonus{1.0};
-  Eigen::Vector3i N_s_a{Eigen::Vector3i::Zero()};
-  Eigen::Vector3d Q_s_a{Eigen::Vector3d::Zero()};
-
-  double result = eyes_on_guys::get_ucb1_bound(action, exploration_bonus, N_s_a, Q_s_a);
-
-  EXPECT_EQ(result, std::numeric_limits<double>::lowest());
-}
+// TODO: Continue testing the non-member functions!
