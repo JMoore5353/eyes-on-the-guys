@@ -16,11 +16,11 @@ Guys::Guys()
   declare_parameters();
 
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("guy_poses", 10);
+  bits_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("guy_bits", 10);
 
   names_ = {
     "Jacob",
     "Brandon",
-    "Ian",
     "Josh",
     "Euler",
     "Gauss",
@@ -53,6 +53,7 @@ void Guys::declare_parameters()
   this->declare_parameter("number_of_guys", 6);
   this->declare_parameter("std_dev", 0.1);
   this->declare_parameter("velocity", 1.0);
+  this->declare_parameter("bits_rate_max", 1.0);
   this->declare_parameter("deflection_radius", 50.0);
   this->declare_parameter("init_min_x", -400.0);
   this->declare_parameter("init_max_x", -375.0);
@@ -73,12 +74,17 @@ void Guys::update_positions()
   std::vector<geometry_msgs::msg::Point> positions;
   positions.reserve(guys_.size());
   for (auto & guy : guys_) {
-    positions.push_back(guy.pose.position);
+    positions.push_back(guy.pose.pose.position);
   }
+
+  std_msgs::msg::Float32MultiArray bits_msg;
+  bits_msg.data.reserve(guys_.size());
+
+  double dt = 1.0 / publish_rate_hz;
 
   for (std::size_t i = 0; i < guys_.size(); ++i) {
     auto & guy = guys_[i];
-    double current_yaw = quaternion_to_yaw(guy.pose.orientation);
+    double current_yaw = quaternion_to_yaw(guy.pose.pose.orientation);
     double proposed_yaw = current_yaw + noise_dist(rng_);
     auto & current = positions[i];
     double yaw_deflection = 0.0;
@@ -106,14 +112,18 @@ void Guys::update_positions()
     double dx = step_size * std::cos(new_yaw);
     double dy = step_size * std::sin(new_yaw);
 
-    guy.pose.position.x += dx;
-    guy.pose.position.y += dy;
-    guy.pose.position.z = 0;
-    guy.pose.orientation = yaw_to_quaternion(new_yaw);
-    guy.header.stamp = stamp;
+    guy.pose.pose.position.x += dx;
+    guy.pose.pose.position.y += dy;
+    guy.pose.pose.position.z = 0;
+    guy.pose.pose.orientation = yaw_to_quaternion(new_yaw);
+    guy.pose.header.stamp = stamp;
+    guy.bits += static_cast<float>(guy.bits_rate * dt);
 
-    pose_pub_->publish(guy);
+    pose_pub_->publish(guy.pose);
+    bits_msg.data.push_back(guy.bits);
   }
+
+  bits_pub_->publish(bits_msg);
 }
 
 void Guys::initialize_guys() {
@@ -122,6 +132,7 @@ void Guys::initialize_guys() {
   double init_max_x = this->get_parameter("init_max_x").as_double();
   double init_min_y = this->get_parameter("init_min_y").as_double();
   double init_max_y = this->get_parameter("init_max_y").as_double();
+  double bits_rate_max = this->get_parameter("bits_rate_max").as_double();
 
   std::vector<std::string> names_pool = names_;
   std::shuffle(names_pool.begin(), names_pool.end(), rng_);
@@ -132,14 +143,17 @@ void Guys::initialize_guys() {
   std::uniform_real_distribution<double> heading_dist(-M_PI, M_PI);
   std::uniform_real_distribution<double> init_x_dist(init_min_x, init_max_x);
   std::uniform_real_distribution<double> init_y_dist(init_min_y, init_max_y);
+  std::uniform_real_distribution<float> bits_rate_dist(0.0f, static_cast<float>(bits_rate_max));
 
   for (int idx = 0; idx < count; ++idx) {
-    geometry_msgs::msg::PoseStamped guy;
-    guy.header.frame_id = names_pool[idx];
-    guy.pose.position.x = init_x_dist(rng_);
-    guy.pose.position.y = init_y_dist(rng_);
-    guy.pose.position.z = 0.0;
-    guy.pose.orientation = yaw_to_quaternion(heading_dist(rng_));
+    GuyState guy;
+    guy.pose.header.frame_id = names_pool[idx];
+    guy.pose.pose.position.x = init_x_dist(rng_);
+    guy.pose.pose.position.y = init_y_dist(rng_);
+    guy.pose.pose.position.z = 0.0;
+    guy.pose.pose.orientation = yaw_to_quaternion(heading_dist(rng_));
+    guy.bits = 0.0f;
+    guy.bits_rate = bits_rate_dist(rng_);
     guys_.push_back(guy);
   }
 }
@@ -148,7 +162,7 @@ void Guys::log_names()
 {
   std::string message = "Guys:";
   for (const auto & guy : guys_) {
-    message += " " + guy.header.frame_id;
+    message += " " + guy.pose.header.frame_id;
   }
   RCLCPP_INFO_STREAM(this->get_logger(), message);
 }
