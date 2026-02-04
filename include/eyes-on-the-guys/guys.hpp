@@ -8,8 +8,8 @@
 
 #include <geometry_msgs/msg/point.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <eyes_on_the_guys/msg/bit.hpp>
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/float32_multi_array.hpp>
 
 namespace eyes_on_guys
 {
@@ -35,7 +35,7 @@ private:
   static double quaternion_to_yaw(const geometry_msgs::msg::Quaternion & quat);
 
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_pub_;
-  rclcpp::Publisher<std_msgs::msg::Float32MultiArray>::SharedPtr bits_pub_;
+  rclcpp::Publisher<eyes_on_the_guys::msg::Bit>::SharedPtr bits_pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 
   std::vector<std::string> names_;
