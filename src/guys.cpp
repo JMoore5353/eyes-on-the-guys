@@ -16,7 +16,7 @@ Guys::Guys()
   declare_parameters();
 
   pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("guy_poses", 10);
-  bits_pub_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("guy_bits", 10);
+  bits_pub_ = this->create_publisher<eyes_on_the_guys::msg::Bit>("guy_bits", 10);
 
   names_ = {
     "Jacob",
@@ -77,9 +77,6 @@ void Guys::update_positions()
     positions.push_back(guy.pose.pose.position);
   }
 
-  std_msgs::msg::Float32MultiArray bits_msg;
-  bits_msg.data.reserve(guys_.size());
-
   double dt = 1.0 / publish_rate_hz;
 
   for (std::size_t i = 0; i < guys_.size(); ++i) {
@@ -120,10 +117,12 @@ void Guys::update_positions()
     guy.bits += static_cast<float>(guy.bits_rate * dt);
 
     pose_pub_->publish(guy.pose);
-    bits_msg.data.push_back(guy.bits);
+    eyes_on_the_guys::msg::Bit bits_msg;
+    bits_msg.header.stamp = stamp;
+    bits_msg.header.frame_id = guy.pose.header.frame_id;
+    bits_msg.bits = guy.bits;
+    bits_pub_->publish(bits_msg);
   }
-
-  bits_pub_->publish(bits_msg);
 }
 
 void Guys::initialize_guys() {

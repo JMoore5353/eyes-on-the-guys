@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(eyes-on-the-guys)
+project(eyes_on_the_guys)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -12,9 +12,11 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
+find_package(rosidl_default_generators REQUIRED)
 
 find_package(Matplot++ QUIET)
 if(NOT Matplot++_FOUND)
@@ -30,6 +32,15 @@ if(NOT Matplot++_FOUND)
     add_subdirectory(${matplotplusplus_SOURCE_DIR} ${matplotplusplus_BINARY_DIR} EXCLUDE_FROM_ALL)
   endif()
 endif()
+
+######################
+##   ROS INTERFACE  ##
+######################
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/Bit.msg"
+  DEPENDENCIES std_msgs
+)
+ament_export_dependencies(rosidl_default_runtime)
 
 
 #####################
@@ -53,11 +64,14 @@ add_executable(guys
 target_include_directories(guys
   PRIVATE
     include/eyes-on-the-guys)
-ament_target_dependencies(guys rclcpp geometry_msgs)
+ament_target_dependencies(guys rclcpp geometry_msgs std_msgs)
+rosidl_target_interfaces(guys
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
 install(
   TARGETS guys
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 add_executable(planner
   src/planner_node.cpp
@@ -74,15 +88,6 @@ endif()
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-########################
-##   PYTHON SCRIPTS   ##
-########################
-install(
-  PROGRAMS
-    src/example.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
