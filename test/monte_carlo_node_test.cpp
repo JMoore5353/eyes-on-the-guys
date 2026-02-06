@@ -80,25 +80,25 @@ TEST(find_best_action, GivenQWithOneZero_ExpectReturnsCorrectAction)
   EXPECT_EQ(result, correct_action);
 }
 
-TEST(node, WhenTakingAction_ExpectCorrectNodeReturned)
+TEST(node, WhenTakingAction_ExpectCorrectMTCSNodeReturned)
 {
   int id{0};
-  auto curr_node = std::make_shared<eyes_on_guys::Node>(id, 5, 1.0);
+  auto curr_node = std::make_shared<eyes_on_guys::MTCSNode>(id, 5, 1.0);
   int action{2};
 
-  std::shared_ptr<eyes_on_guys::Node> next_node = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MTCSNode> next_node = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), action);
 }
 
-TEST(node, GivenChildNodeAlreadyCreated_WhenTakingAction_ExpectSameNodeReturned)
+TEST(node, GivenChildMTCSNodeAlreadyCreated_WhenTakingAction_ExpectSameMTCSNodeReturned)
 {
   int id{0};
-  auto curr_node = std::make_shared<eyes_on_guys::Node>(id, 5, 1.0);
+  auto curr_node = std::make_shared<eyes_on_guys::MTCSNode>(id, 5, 1.0);
   int action{2};
 
-  std::shared_ptr<eyes_on_guys::Node> next_node = curr_node->take_action(action);
-  std::shared_ptr<eyes_on_guys::Node> next_node2 = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MTCSNode> next_node = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MTCSNode> next_node2 = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), next_node2->get_id());
   EXPECT_EQ(next_node, next_node2);
@@ -107,10 +107,10 @@ TEST(node, GivenChildNodeAlreadyCreated_WhenTakingAction_ExpectSameNodeReturned)
 TEST(node, WhenTakingSelfAction_ExpectSelfReturned)
 {
   int id{0};
-  auto curr_node = std::make_shared<eyes_on_guys::Node>(id, 5, 1.0);
+  auto curr_node = std::make_shared<eyes_on_guys::MTCSNode>(id, 5, 1.0);
   int action{0};
 
-  std::shared_ptr<eyes_on_guys::Node> next_node = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MTCSNode> next_node = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), curr_node->get_id());
   EXPECT_EQ(next_node, curr_node);
