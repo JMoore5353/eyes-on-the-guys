@@ -1,30 +1,51 @@
 #include <Eigen/Core>
 #include <memory>
+#include <vector>
 
+#include "eyes_on_guys_problem.hpp"
 #include "monte_carlo_node.hpp"
 
 namespace eyes_on_guys
 {
 
-Node::Node(const int id, const int branching_factor, const double exploration_bonus)
+MTCSNode::MTCSNode(const int id, const int branching_factor, const double exploration_bonus)
     : id_{id}
     , branching_factor_{branching_factor}
     , exploration_bonus_{exploration_bonus}
     , node_has_been_visited_{false}
+    , problem_info_{branching_factor + 1, 1.0,
+                    Eigen::MatrixXd::Zero(branching_factor + 1, branching_factor + 1)}
 {
   N_s_a_ = Eigen::VectorXi::Zero(branching_factor_);
   Q_s_a_ = Eigen::VectorXd::Zero(branching_factor_);
-  for (int i{0}; i < branching_factor_ + 1; ++i) {
+  int num_agents = branching_factor_ + 1;
+  for (int i{0}; i < num_agents; ++i) {
     children_.push_back(nullptr);
   }
 }
 
-int Node::explore_best_action() const
+MTCSNode::MTCSNode(const int id, const int branching_factor, const double exploration_bonus,
+                   const EyesOnGuysProblem & problem_info)
+    : id_{id}
+    , branching_factor_{branching_factor}
+    , exploration_bonus_{exploration_bonus}
+    , node_has_been_visited_{false}
+    , problem_info_{problem_info}
+{
+  N_s_a_ = Eigen::VectorXi::Zero(branching_factor_);
+  Q_s_a_ = Eigen::VectorXd::Zero(branching_factor_);
+  int num_agents = branching_factor_ + 1;
+  for (int i{0}; i < num_agents; ++i) {
+    children_.push_back(nullptr);
+  }
+}
+
+int MTCSNode::explore_best_action() const
 {
   return find_best_action(id_, branching_factor_, exploration_bonus_, N_s_a_, Q_s_a_);
 }
 
-bool Node::has_been_visited()
+bool MTCSNode::has_been_visited()
 {
   if (!node_has_been_visited_) {
     node_has_been_visited_ = true;
@@ -33,19 +54,22 @@ bool Node::has_been_visited()
   return true;
 }
 
-std::shared_ptr<Node> Node::take_action(const int action)
+std::shared_ptr<MTCSNode> MTCSNode::take_action(const int action)
 {
   if (action >= branching_factor_ || action < 0 || action == id_) {
     return shared_from_this();
   }
 
   if (children_.at(action) == nullptr) {
-    children_[action] = std::make_shared<Node>(action, branching_factor_, exploration_bonus_);
+    EyesOnGuysProblem child_problem_info =
+      problem_info_.create_child_eyes_on_guys_state(id_, action);
+    children_[action] =
+      std::make_shared<MTCSNode>(action, branching_factor_, exploration_bonus_, child_problem_info);
   }
   return children_.at(action);
 }
 
-void Node::update_count_and_action_value_function(const int action, const double q)
+void MTCSNode::update_count_and_action_value_function(const int action, const double q)
 {
   if (action >= branching_factor_ || action < 0) {
     return;

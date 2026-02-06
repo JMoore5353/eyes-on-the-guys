@@ -3,20 +3,25 @@
 
 #include <Eigen/Core>
 #include <memory>
+#include <vector>
+
+#include "eyes_on_guys_problem.hpp"
 
 namespace eyes_on_guys
 {
 
-class Node : public std::enable_shared_from_this<Node>
+class MTCSNode : public std::enable_shared_from_this<MTCSNode>
 {
 public:
-  Node(const int id, const int branching_factor, const double exploration_bonus);
+  MTCSNode(const int id, const int branching_factor, const double exploration_bonus);
+  MTCSNode(const int id, const int branching_factor, const double exploration_bonus,
+           const EyesOnGuysProblem & problem_info);
 
   inline int get_id() const { return id_; }
 
   int explore_best_action() const;
   bool has_been_visited();
-  std::shared_ptr<Node> take_action(const int action);
+  std::shared_ptr<MTCSNode> take_action(const int action);
   void update_count_and_action_value_function(const int action, const double q);
 
 private:
@@ -26,7 +31,9 @@ private:
   bool node_has_been_visited_;
   Eigen::VectorXi N_s_a_;
   Eigen::VectorXd Q_s_a_;
-  std::vector<std::shared_ptr<Node>> children_;
+  std::vector<std::shared_ptr<MTCSNode>> children_;
+
+  EyesOnGuysProblem problem_info_;
 };
 int find_best_action(const int & id, const int & branching_factor, const double & exploration_bonus,
                      const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a);
