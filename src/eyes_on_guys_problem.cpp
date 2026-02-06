@@ -54,4 +54,25 @@ double compute_time_to_take_action(const int curr_state, const int action, const
   return distance_between_agents(curr_state, action) / relay_speed;
 }
 
+double compute_reward_model(const int curr_state, const int next_state,
+                            const EyesOnGuysProblem & curr_state_info,
+                            const EyesOnGuysProblem & next_state_info)
+{
+  double gamma{1.0};
+  double beta{1.0};
+  double zeta{1.0};
+
+  Eigen::MatrixXd delta_shared_info =
+    next_state_info.shared_info_matrix - curr_state_info.shared_info_matrix;
+  double shared_info_reward = gamma * delta_shared_info.norm();
+
+  double distance_penalty = beta * curr_state_info.distance_between_agents(curr_state, next_state);
+
+  double time_since_last_visit_penalty{0.0};
+  for (double time : next_state_info.time_since_last_relay_contact_with_agent) {
+    time_since_last_visit_penalty += zeta * time;
+  }
+
+  return shared_info_reward - distance_penalty - time_since_last_visit_penalty;
+}
 } // namespace eyes_on_guys

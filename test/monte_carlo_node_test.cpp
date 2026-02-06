@@ -56,6 +56,24 @@ TEST(find_best_action, ExpectFindBestActionDoesNotReturnSelf)
   EXPECT_NE(result, id);
 }
 
+TEST(find_best_action, GivenNegativeValues_ExpectFindBestActionDoesNotReturnSelf)
+{
+  int id{0};
+  Eigen::Vector2i N_s_a = Eigen::Vector2i::Zero();
+  Eigen::Vector2d Q_s_a = Eigen::Vector2d::Zero();
+  N_s_a[1] = 2;
+  Q_s_a[1] = -1000;
+
+  int result = eyes_on_guys::find_best_action(id, 1, 1.0, N_s_a, Q_s_a);
+
+  EXPECT_NE(result, id);
+
+  id = 1;
+  result = eyes_on_guys::find_best_action(id, 1, 1.0, N_s_a, Q_s_a);
+
+  EXPECT_NE(result, id);
+}
+
 TEST(find_best_action, ExpectFindBestActionReturnsFirstValue)
 {
   int id{2};

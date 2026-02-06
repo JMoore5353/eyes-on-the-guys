@@ -16,9 +16,9 @@ MTCSNode::MTCSNode(const int id, const int branching_factor, const double explor
     , problem_info_{branching_factor + 1, 1.0,
                     Eigen::MatrixXd::Zero(branching_factor + 1, branching_factor + 1)}
 {
-  N_s_a_ = Eigen::VectorXi::Zero(branching_factor_);
-  Q_s_a_ = Eigen::VectorXd::Zero(branching_factor_);
   int num_agents = branching_factor_ + 1;
+  N_s_a_ = Eigen::VectorXi::Zero(num_agents);
+  Q_s_a_ = Eigen::VectorXd::Zero(num_agents);
   for (int i{0}; i < num_agents; ++i) {
     children_.push_back(nullptr);
   }
@@ -32,9 +32,9 @@ MTCSNode::MTCSNode(const int id, const int branching_factor, const double explor
     , node_has_been_visited_{false}
     , problem_info_{problem_info}
 {
-  N_s_a_ = Eigen::VectorXi::Zero(branching_factor_);
-  Q_s_a_ = Eigen::VectorXd::Zero(branching_factor_);
   int num_agents = branching_factor_ + 1;
+  N_s_a_ = Eigen::VectorXi::Zero(num_agents);
+  Q_s_a_ = Eigen::VectorXd::Zero(num_agents);
   for (int i{0}; i < num_agents; ++i) {
     children_.push_back(nullptr);
   }
@@ -45,14 +45,8 @@ int MTCSNode::explore_best_action() const
   return find_best_action(id_, branching_factor_, exploration_bonus_, N_s_a_, Q_s_a_);
 }
 
-bool MTCSNode::has_been_visited()
-{
-  if (!node_has_been_visited_) {
-    node_has_been_visited_ = true;
-    return false;
-  }
-  return true;
-}
+bool MTCSNode::has_been_visited() { return node_has_been_visited_; }
+void MTCSNode::visit_node() { node_has_been_visited_ = true; }
 
 std::shared_ptr<MTCSNode> MTCSNode::take_action(const int action)
 {

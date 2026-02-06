@@ -18,9 +18,17 @@ public:
            const EyesOnGuysProblem & problem_info);
 
   inline int get_id() const { return id_; }
+  inline const EyesOnGuysProblem & get_ref_to_problem_info() const { return problem_info_; }
+  inline const Eigen::VectorXd & get_action_value_function() const { return Q_s_a_; }
+  inline const Eigen::VectorXi & get_action_state_count() const { return N_s_a_; }
+  inline const std::vector<std::shared_ptr<MTCSNode>> & get_children_vector() const
+  {
+    return children_;
+  }
 
   int explore_best_action() const;
   bool has_been_visited();
+  void visit_node();
   std::shared_ptr<MTCSNode> take_action(const int action);
   void update_count_and_action_value_function(const int action, const double q);
 
