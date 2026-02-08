@@ -11,7 +11,7 @@ namespace eyes_on_guys
 
 TEST(find_greedy_action, WhenFindingGreedyAction_ExpectTheNodesGreedyAction)
 {
-  auto node = std::make_shared<MTCSNode>(0, 10, 1.0);
+  auto node = std::make_shared<MCTSNode>(0, 10, 1.0);
   int node_greedy_action = node->explore_best_action();
 
   int greedy_action = find_greedy_action(node);
@@ -21,11 +21,11 @@ TEST(find_greedy_action, WhenFindingGreedyAction_ExpectTheNodesGreedyAction)
 
 TEST(transition_from_state, WhenTransitioning_ExpectTransitionIsDeterministic)
 {
-  auto node = std::make_shared<MTCSNode>(0, 10, 1.0);
+  auto node = std::make_shared<MCTSNode>(0, 10, 1.0);
   int action{2};
 
   for (int i = 0; i < 1000; ++i) {
-    std::shared_ptr<MTCSNode> new_node = transition_from_state(node, action);
+    std::shared_ptr<MCTSNode> new_node = transition_from_state(node, action);
     EXPECT_EQ(new_node->get_id(), action);
   }
 }
@@ -89,7 +89,7 @@ TEST_F(MCTSTest, Given2AgentsAndOneIteration_ExpectActionIsOtherAgent)
 TEST_F(MCTSTest, WhenLookaheadingWithZeroDepth_ExpectCurrStateUnchanged)
 {
   auto curr_node =
-    std::make_shared<MTCSNode>(initial_state, num_agents - 1, exploration_bonus, problem_info);
+    std::make_shared<MCTSNode>(initial_state, num_agents - 1, exploration_bonus, problem_info);
 
   double lookahead_reward = lookahead_value_function_estimate(
     curr_node, num_agents, lookahead_depth, discount_factor, lookahead_iters);
@@ -103,7 +103,7 @@ TEST_F(MCTSTest, WhenLookaheadingWithZeroDepth_ExpectCurrStateUnchanged)
 TEST_F(MCTSTest, WhenLookaheadingWith10Depth_ExpectCurrStateUnchanged)
 {
   auto curr_node =
-    std::make_shared<MTCSNode>(initial_state, num_agents - 1, exploration_bonus, problem_info);
+    std::make_shared<MCTSNode>(initial_state, num_agents - 1, exploration_bonus, problem_info);
   lookahead_depth = 10;
 
   double lookahead_reward = lookahead_value_function_estimate(
@@ -113,6 +113,29 @@ TEST_F(MCTSTest, WhenLookaheadingWith10Depth_ExpectCurrStateUnchanged)
   for (int i = 0; i < 2; ++i) {
     EXPECT_EQ(curr_node->get_children_vector()[i], nullptr);
   }
+}
+
+TEST_F(MCTSTest, WhenLookaheading_ExpectNonZeroReward)
+{
+  auto curr_node =
+    std::make_shared<MCTSNode>(initial_state, num_agents - 1, exploration_bonus, problem_info);
+  lookahead_depth = 10;
+
+  double lookahead_reward = lookahead_value_function_estimate(
+    curr_node, num_agents, lookahead_depth, discount_factor, lookahead_iters);
+
+  EXPECT_NE(lookahead_reward, 0.0);
+}
+
+TEST_F(MCTSTest, ExpectRewardFromSuccessorStateIsNotZero)
+{
+  auto curr_node =
+    std::make_shared<MCTSNode>(initial_state, num_agents - 1, exploration_bonus, problem_info);
+  std::shared_ptr<MCTSNode> next_node = transition_from_state(curr_node, 1);
+
+  double reward = compute_reward_from_transitioning(curr_node, next_node);
+
+  EXPECT_NE(reward, 0.0);
 }
 
 } // namespace eyes_on_guys

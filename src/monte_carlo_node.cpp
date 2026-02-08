@@ -8,7 +8,7 @@
 namespace eyes_on_guys
 {
 
-MTCSNode::MTCSNode(const int id, const int branching_factor, const double exploration_bonus)
+MCTSNode::MCTSNode(const int id, const int branching_factor, const double exploration_bonus)
     : id_{id}
     , branching_factor_{branching_factor}
     , exploration_bonus_{exploration_bonus}
@@ -24,7 +24,7 @@ MTCSNode::MTCSNode(const int id, const int branching_factor, const double explor
   }
 }
 
-MTCSNode::MTCSNode(const int id, const int branching_factor, const double exploration_bonus,
+MCTSNode::MCTSNode(const int id, const int branching_factor, const double exploration_bonus,
                    const EyesOnGuysProblem & problem_info)
     : id_{id}
     , branching_factor_{branching_factor}
@@ -40,15 +40,15 @@ MTCSNode::MTCSNode(const int id, const int branching_factor, const double explor
   }
 }
 
-int MTCSNode::explore_best_action() const
+int MCTSNode::explore_best_action() const
 {
   return find_best_action(id_, branching_factor_, exploration_bonus_, N_s_a_, Q_s_a_);
 }
 
-bool MTCSNode::has_been_visited() { return node_has_been_visited_; }
-void MTCSNode::visit_node() { node_has_been_visited_ = true; }
+bool MCTSNode::has_been_visited() { return node_has_been_visited_; }
+void MCTSNode::visit_node() { node_has_been_visited_ = true; }
 
-std::shared_ptr<MTCSNode> MTCSNode::take_action(const int action)
+std::shared_ptr<MCTSNode> MCTSNode::take_action(const int action)
 {
   if (action >= branching_factor_ || action < 0 || action == id_) {
     return shared_from_this();
@@ -58,12 +58,12 @@ std::shared_ptr<MTCSNode> MTCSNode::take_action(const int action)
     EyesOnGuysProblem child_problem_info =
       problem_info_.create_child_eyes_on_guys_state(id_, action);
     children_[action] =
-      std::make_shared<MTCSNode>(action, branching_factor_, exploration_bonus_, child_problem_info);
+      std::make_shared<MCTSNode>(action, branching_factor_, exploration_bonus_, child_problem_info);
   }
   return children_.at(action);
 }
 
-void MTCSNode::update_count_and_action_value_function(const int action, const double q)
+void MCTSNode::update_count_and_action_value_function(const int action, const double q)
 {
   if (action >= branching_factor_ || action < 0) {
     return;

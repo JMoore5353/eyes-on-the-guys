@@ -98,25 +98,25 @@ TEST(find_best_action, GivenQWithOneZero_ExpectReturnsCorrectAction)
   EXPECT_EQ(result, correct_action);
 }
 
-TEST(node, WhenTakingAction_ExpectCorrectMTCSNodeReturned)
+TEST(node, WhenTakingAction_ExpectCorrectMCTSNodeReturned)
 {
   int id{0};
-  auto curr_node = std::make_shared<eyes_on_guys::MTCSNode>(id, 5, 1.0);
+  auto curr_node = std::make_shared<eyes_on_guys::MCTSNode>(id, 5, 1.0);
   int action{2};
 
-  std::shared_ptr<eyes_on_guys::MTCSNode> next_node = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MCTSNode> next_node = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), action);
 }
 
-TEST(node, GivenChildMTCSNodeAlreadyCreated_WhenTakingAction_ExpectSameMTCSNodeReturned)
+TEST(node, GivenChildMCTSNodeAlreadyCreated_WhenTakingAction_ExpectSameMCTSNodeReturned)
 {
   int id{0};
-  auto curr_node = std::make_shared<eyes_on_guys::MTCSNode>(id, 5, 1.0);
+  auto curr_node = std::make_shared<eyes_on_guys::MCTSNode>(id, 5, 1.0);
   int action{2};
 
-  std::shared_ptr<eyes_on_guys::MTCSNode> next_node = curr_node->take_action(action);
-  std::shared_ptr<eyes_on_guys::MTCSNode> next_node2 = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MCTSNode> next_node = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MCTSNode> next_node2 = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), next_node2->get_id());
   EXPECT_EQ(next_node, next_node2);
@@ -125,10 +125,10 @@ TEST(node, GivenChildMTCSNodeAlreadyCreated_WhenTakingAction_ExpectSameMTCSNodeR
 TEST(node, WhenTakingSelfAction_ExpectSelfReturned)
 {
   int id{0};
-  auto curr_node = std::make_shared<eyes_on_guys::MTCSNode>(id, 5, 1.0);
+  auto curr_node = std::make_shared<eyes_on_guys::MCTSNode>(id, 5, 1.0);
   int action{0};
 
-  std::shared_ptr<eyes_on_guys::MTCSNode> next_node = curr_node->take_action(action);
+  std::shared_ptr<eyes_on_guys::MCTSNode> next_node = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), curr_node->get_id());
   EXPECT_EQ(next_node, curr_node);

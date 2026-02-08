@@ -12,11 +12,11 @@ public:
   EyesOnGuysProblem(const int num_agents, const double relay_speed,
                     const Eigen::MatrixXd & distance_between_agents);
 
-  Eigen::VectorXd relays_current_info;
-  Eigen::MatrixXd shared_info_matrix;
-  Eigen::VectorXd time_since_last_relay_contact_with_agent;
+  Eigen::VectorXd relays_current_info;                      // nx1
+  Eigen::MatrixXd shared_info_matrix;                       // nxn
+  Eigen::VectorXd time_since_last_relay_contact_with_agent; // nx1
   double relay_speed;
-  Eigen::MatrixXd distance_between_agents;
+  Eigen::MatrixXd distance_between_agents; // nxn where n is num of agents
 
   EyesOnGuysProblem create_child_eyes_on_guys_state(const int curr_state, const int action);
 };

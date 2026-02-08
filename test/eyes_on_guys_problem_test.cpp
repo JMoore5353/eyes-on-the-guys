@@ -36,4 +36,10 @@ TEST(eyes_on_guys_problem, WhenCreatingChild_ExpectCorrectValues)
             child_state.time_since_last_relay_contact_with_agent);
 }
 
+TEST(compute_reward_model, ExpectRewardIsNonZero)
+{
+  // TODO:
+  EXPECT_TRUE(false);
+}
+
 } // namespace eyes_on_guys
