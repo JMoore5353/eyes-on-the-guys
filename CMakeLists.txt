@@ -66,8 +66,8 @@ target_include_directories(guys
   PRIVATE
     include/eyes-on-the-guys)
 ament_target_dependencies(guys rclcpp geometry_msgs std_msgs)
-rosidl_target_interfaces(guys
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} rosidl_typesupport_cpp)
+target_link_libraries(guys "${cpp_typesupport_target}")
 install(
   TARGETS guys
   DESTINATION lib/${PROJECT_NAME}
@@ -103,15 +103,6 @@ target_include_directories(monte_carlo_tree_search
   PUBLIC
     include/eyes-on-the-guys)
 target_link_libraries(monte_carlo_tree_search Eigen3::Eigen)
-
-########################
-##   PYTHON SCRIPTS   ##
-########################
-install(
-  PROGRAMS
-    src/example.py
-  DESTINATION lib/${PROJECT_NAME}
-)
 
 ###################
 ##   RESOURCES   ##
