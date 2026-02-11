@@ -11,6 +11,7 @@ namespace eyes_on_guys
 
 MonteCarloTreeSearch::MonteCarloTreeSearch(const int num_states)
     : num_states_{num_states}
+    , initial_node_{nullptr}
 {}
 
 int MonteCarloTreeSearch::search_for_best_action(const int initial_state, const int num_iter,
@@ -25,7 +26,7 @@ int MonteCarloTreeSearch::search_for_best_action(const int initial_state, const 
   }
 
   auto initial_node =
-    std::make_shared<MCTSNode>(initial_state, num_states_ - 1, exploration_bonus, problem_info);
+    std::make_shared<MCTSNode>(initial_state, num_states_, exploration_bonus, problem_info);
   for (int i = 0; i < num_iter; ++i) {
     simulate(initial_node, depth, discount_factor, lookahead_depth, lookahead_iters);
   }
@@ -61,12 +62,29 @@ double MonteCarloTreeSearch::simulate(std::shared_ptr<MCTSNode> curr_state, cons
   return q;
 }
 
+std::vector<int> MonteCarloTreeSearch::get_greedy_sequence() const
+{
+  if (initial_node_ == nullptr) {
+    return std::vector<int>();
+  }
+
+  std::vector<int> out;
+  std::shared_ptr<const MCTSNode> curr_node = initial_node_;
+  while (curr_node != nullptr) {
+    int best_action = find_greedy_action(curr_node);
+    out.push_back(best_action);
+    curr_node = curr_node->get_child(best_action);
+  }
+
+  return out;
+}
+
 double lookahead_value_function_estimate(const std::shared_ptr<MCTSNode> curr_state,
                                          const int num_states, const int depth,
                                          const double discount, const int num_iters)
 {
   if (num_iters == 0) {
-    return std::numeric_limits<double>::infinity();
+    return 0;
   }
 
   double average_reward{0.0};
@@ -113,7 +131,7 @@ double compute_reward_from_transitioning(const std::shared_ptr<MCTSNode> curr_st
                               next_state_problem_info);
 }
 
-int find_greedy_action(const std::shared_ptr<MCTSNode> curr_state)
+int find_greedy_action(const std::shared_ptr<const MCTSNode> curr_state)
 {
   return curr_state->explore_best_action();
 }

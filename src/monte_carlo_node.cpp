@@ -8,15 +8,13 @@
 namespace eyes_on_guys
 {
 
-MCTSNode::MCTSNode(const int id, const int branching_factor, const double exploration_bonus)
+MCTSNode::MCTSNode(const int id, const int num_agents, const double exploration_bonus)
     : id_{id}
-    , branching_factor_{branching_factor}
+    , num_agents_{num_agents}
     , exploration_bonus_{exploration_bonus}
     , node_has_been_visited_{false}
-    , problem_info_{branching_factor + 1, 1.0,
-                    Eigen::MatrixXd::Zero(branching_factor + 1, branching_factor + 1)}
+    , problem_info_{num_agents, 1.0, Eigen::MatrixXd::Zero(num_agents, num_agents)}
 {
-  int num_agents = branching_factor_ + 1;
   N_s_a_ = Eigen::VectorXi::Zero(num_agents);
   Q_s_a_ = Eigen::VectorXd::Zero(num_agents);
   for (int i{0}; i < num_agents; ++i) {
@@ -24,15 +22,14 @@ MCTSNode::MCTSNode(const int id, const int branching_factor, const double explor
   }
 }
 
-MCTSNode::MCTSNode(const int id, const int branching_factor, const double exploration_bonus,
+MCTSNode::MCTSNode(const int id, const int num_agents, const double exploration_bonus,
                    const EyesOnGuysProblem & problem_info)
     : id_{id}
-    , branching_factor_{branching_factor}
+    , num_agents_{num_agents}
     , exploration_bonus_{exploration_bonus}
     , node_has_been_visited_{false}
     , problem_info_{problem_info}
 {
-  int num_agents = branching_factor_ + 1;
   N_s_a_ = Eigen::VectorXi::Zero(num_agents);
   Q_s_a_ = Eigen::VectorXd::Zero(num_agents);
   for (int i{0}; i < num_agents; ++i) {
@@ -42,7 +39,7 @@ MCTSNode::MCTSNode(const int id, const int branching_factor, const double explor
 
 int MCTSNode::explore_best_action() const
 {
-  return find_best_action(id_, branching_factor_, exploration_bonus_, N_s_a_, Q_s_a_);
+  return find_best_action(id_, num_agents_, exploration_bonus_, N_s_a_, Q_s_a_);
 }
 
 bool MCTSNode::has_been_visited() { return node_has_been_visited_; }
@@ -50,7 +47,7 @@ void MCTSNode::visit_node() { node_has_been_visited_ = true; }
 
 std::shared_ptr<MCTSNode> MCTSNode::take_action(const int action)
 {
-  if (action >= branching_factor_ || action < 0 || action == id_) {
+  if (action >= num_agents_ || action < 0 || action == id_) {
     return shared_from_this();
   }
 
@@ -58,14 +55,14 @@ std::shared_ptr<MCTSNode> MCTSNode::take_action(const int action)
     EyesOnGuysProblem child_problem_info =
       problem_info_.create_child_eyes_on_guys_state(id_, action);
     children_[action] =
-      std::make_shared<MCTSNode>(action, branching_factor_, exploration_bonus_, child_problem_info);
+      std::make_shared<MCTSNode>(action, num_agents_, exploration_bonus_, child_problem_info);
   }
   return children_.at(action);
 }
 
 void MCTSNode::update_count_and_action_value_function(const int action, const double q)
 {
-  if (action >= branching_factor_ || action < 0) {
+  if (action >= num_agents_ || action < 0) {
     return;
   }
 
@@ -73,12 +70,12 @@ void MCTSNode::update_count_and_action_value_function(const int action, const do
   Q_s_a_[action] = compute_running_average(q, Q_s_a_[action], N_s_a_[action]);
 }
 
-int find_best_action(const int & id, const int & branching_factor, const double & exploration_bonus,
+int find_best_action(const int & id, const int & num_agents, const double & exploration_bonus,
                      const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a)
 {
   int best_action{0};
   double best_action_ucb1_value = std::numeric_limits<double>::lowest();
-  for (int i = 0; i < branching_factor + 1; ++i) {
+  for (int i = 0; i < num_agents; ++i) {
     if (i == id) {
       continue;
     }

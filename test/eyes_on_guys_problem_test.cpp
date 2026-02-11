@@ -5,22 +5,33 @@
 namespace eyes_on_guys
 {
 
-TEST(eyes_on_guys_problem, WhenCreatingChild_ExpectCorrectValues)
+class EyesOnGuysProblemTest : public ::testing::Test
 {
+public:
+  EyesOnGuysProblemTest()
+      : problem{num_agents, relay_speed, dist_between_agents}
+  {
+    dist_between_agents << 0, 20, 40, 60, 20, 0, 80, 100, 40, 80, 0, 120, 60, 100, 120, 0;
+    info_matrix << 0, 10, 20, 0, 0, 0, 0, 0, 30, 10, 0, 0, 0, 0, 0, 0;
+
+    problem.relays_current_info = Eigen::Vector4d{30, 10, 40, 0};
+    problem.distance_between_agents = dist_between_agents;
+    problem.shared_info_matrix = info_matrix;
+    problem.time_since_last_relay_contact_with_agent = Eigen::Vector4d{10, 30, 0, 40};
+  }
+
+protected:
   int num_agents{4};
   double relay_speed{5.0};
   Eigen::Matrix4d dist_between_agents;
-  dist_between_agents << 0, 20, 40, 60, 20, 0, 80, 100, 40, 80, 0, 120, 60, 100, 120, 0;
-
-  EyesOnGuysProblem problem{num_agents, relay_speed, dist_between_agents};
-  problem.relays_current_info = Eigen::Vector4d{30, 10, 40, 0};
   Eigen::Matrix4d info_matrix;
-  info_matrix << 0, 10, 20, 0, 0, 0, 0, 0, 30, 10, 0, 0, 0, 0, 0, 0;
-  problem.shared_info_matrix = info_matrix;
-  problem.time_since_last_relay_contact_with_agent = Eigen::Vector4d{10, 30, 0, 40};
   int curr_state{0};
   int action{3};
+  EyesOnGuysProblem problem;
+};
 
+TEST_F(EyesOnGuysProblemTest, WhenCreatingChild_ExpectCorrectValues)
+{
   EyesOnGuysProblem child_state = problem.create_child_eyes_on_guys_state(curr_state, action);
 
   double dt = compute_time_to_take_action(curr_state, action, relay_speed, dist_between_agents);
@@ -36,10 +47,14 @@ TEST(eyes_on_guys_problem, WhenCreatingChild_ExpectCorrectValues)
             child_state.time_since_last_relay_contact_with_agent);
 }
 
-TEST(compute_reward_model, ExpectRewardIsNonZero)
+TEST_F(EyesOnGuysProblemTest, WhenComputingReward_ExpectRewardIsNonZero)
 {
-  // TODO:
-  EXPECT_TRUE(false);
+  EyesOnGuysProblem child_state = problem.create_child_eyes_on_guys_state(curr_state, action);
+
+  double reward = compute_reward_model(curr_state, action, problem, child_state);
+
+  ASSERT_NE(problem.shared_info_matrix, child_state.shared_info_matrix);
+  EXPECT_NE(reward, 0.0);
 }
 
 } // namespace eyes_on_guys

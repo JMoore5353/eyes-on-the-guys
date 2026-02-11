@@ -21,13 +21,17 @@ public:
                              const EyesOnGuysProblem & problem_info, const int lookahead_depth = 5,
                              const int lookahead_iters = 10);
 
+  // TODO: Could you use this greedy sequence to get a bunch of the top options and compare to make sure that the
+  // algorithm is returning the best option?
+  std::vector<int> get_greedy_sequence() const;
+
 private:
   int num_states_;
+  std::shared_ptr<MCTSNode> initial_node_;
 
   double simulate(std::shared_ptr<MCTSNode> curr_state, const int depth,
                   const double discount_factor, const int lookahead_depth,
                   const int lookahead_iters);
-  // TODO: Might be worth it to get the greedy sequence... Would be interesting to plot how it changes over time.
 };
 
 double lookahead_value_function_estimate(const std::shared_ptr<MCTSNode> curr_state,
@@ -38,7 +42,7 @@ std::shared_ptr<MCTSNode> transition_from_state(std::shared_ptr<MCTSNode> curr_n
                                                 const int action);
 double compute_reward_from_transitioning(const std::shared_ptr<MCTSNode> curr_state,
                                          const std::shared_ptr<MCTSNode> next_state);
-int find_greedy_action(const std::shared_ptr<MCTSNode> curr_state);
+int find_greedy_action(const std::shared_ptr<const MCTSNode> curr_state);
 
 } // namespace eyes_on_guys
 

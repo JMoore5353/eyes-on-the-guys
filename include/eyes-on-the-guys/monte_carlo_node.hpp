@@ -13,8 +13,8 @@ namespace eyes_on_guys
 class MCTSNode : public std::enable_shared_from_this<MCTSNode>
 {
 public:
-  MCTSNode(const int id, const int branching_factor, const double exploration_bonus);
-  MCTSNode(const int id, const int branching_factor, const double exploration_bonus,
+  MCTSNode(const int id, const int num_agents, const double exploration_bonus);
+  MCTSNode(const int id, const int num_agents, const double exploration_bonus,
            const EyesOnGuysProblem & problem_info);
 
   inline int get_id() const { return id_; }
@@ -25,6 +25,10 @@ public:
   {
     return children_;
   }
+  inline const std::shared_ptr<MCTSNode> get_child(const int child_id) const
+  {
+    return children_.at(child_id);
+  }
 
   int explore_best_action() const;
   bool has_been_visited();
@@ -34,7 +38,7 @@ public:
 
 private:
   int id_;
-  int branching_factor_;
+  int num_agents_;
   double exploration_bonus_;
   bool node_has_been_visited_;
   Eigen::VectorXi N_s_a_;
@@ -43,7 +47,7 @@ private:
 
   EyesOnGuysProblem problem_info_;
 };
-int find_best_action(const int & id, const int & branching_factor, const double & exploration_bonus,
+int find_best_action(const int & id, const int & num_agents, const double & exploration_bonus,
                      const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a);
 double get_ucb1_bound(const int & action, const double & exploration_bonus,
                       const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a);

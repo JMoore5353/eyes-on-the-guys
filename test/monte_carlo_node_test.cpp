@@ -46,12 +46,12 @@ TEST(find_best_action, ExpectFindBestActionDoesNotReturnSelf)
   Eigen::Vector2i N_s_a = Eigen::Vector2i::Zero();
   Eigen::Vector2d Q_s_a = Eigen::Vector2d::Zero();
 
-  int result = eyes_on_guys::find_best_action(id, 1, 1.0, N_s_a, Q_s_a);
+  int result = eyes_on_guys::find_best_action(id, 2, 1.0, N_s_a, Q_s_a);
 
   EXPECT_NE(result, id);
 
   id = 1;
-  result = eyes_on_guys::find_best_action(id, 1, 1.0, N_s_a, Q_s_a);
+  result = eyes_on_guys::find_best_action(id, 2, 1.0, N_s_a, Q_s_a);
 
   EXPECT_NE(result, id);
 }
@@ -64,12 +64,12 @@ TEST(find_best_action, GivenNegativeValues_ExpectFindBestActionDoesNotReturnSelf
   N_s_a[1] = 2;
   Q_s_a[1] = -1000;
 
-  int result = eyes_on_guys::find_best_action(id, 1, 1.0, N_s_a, Q_s_a);
+  int result = eyes_on_guys::find_best_action(id, 2, 1.0, N_s_a, Q_s_a);
 
   EXPECT_NE(result, id);
 
   id = 1;
-  result = eyes_on_guys::find_best_action(id, 1, 1.0, N_s_a, Q_s_a);
+  result = eyes_on_guys::find_best_action(id, 2, 1.0, N_s_a, Q_s_a);
 
   EXPECT_NE(result, id);
 }
@@ -107,6 +107,7 @@ TEST(node, WhenTakingAction_ExpectCorrectMCTSNodeReturned)
   std::shared_ptr<eyes_on_guys::MCTSNode> next_node = curr_node->take_action(action);
 
   EXPECT_EQ(next_node->get_id(), action);
+  EXPECT_NE(curr_node->get_id(), action);
 }
 
 TEST(node, GivenChildMCTSNodeAlreadyCreated_WhenTakingAction_ExpectSameMCTSNodeReturned)
@@ -132,4 +133,15 @@ TEST(node, WhenTakingSelfAction_ExpectSelfReturned)
 
   EXPECT_EQ(next_node->get_id(), curr_node->get_id());
   EXPECT_EQ(next_node, curr_node);
+}
+
+TEST(node, GivenTwoAgents_WhenTakingAction_ExpectOtherAgentReturned)
+{
+  int id{0};
+  int action{1};
+  auto curr_node = std::make_shared<eyes_on_guys::MCTSNode>(id, 2, 1.0);
+
+  std::shared_ptr<eyes_on_guys::MCTSNode> next_node = curr_node->take_action(action);
+
+  EXPECT_EQ(next_node->get_id(), action);
 }
