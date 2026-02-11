@@ -1,7 +1,10 @@
 #include <Eigen/Core>
+#include <cmath>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <random>
+#include <vector>
 
 #include "monte_carlo_node.hpp"
 #include "monte_carlo_tree_search.hpp"
@@ -21,16 +24,16 @@ int MonteCarloTreeSearch::search_for_best_action(const int initial_state, const 
                                                  const int lookahead_depth,
                                                  const int lookahead_iters)
 {
-  if (initial_state >= num_states_) {
+  if (initial_state >= num_states_ || initial_state < 0) {
     return -1;
   }
 
-  auto initial_node =
+  initial_node_ =
     std::make_shared<MCTSNode>(initial_state, num_states_, exploration_bonus, problem_info);
   for (int i = 0; i < num_iter; ++i) {
-    simulate(initial_node, depth, discount_factor, lookahead_depth, lookahead_iters);
+    simulate(initial_node_, depth, discount_factor, lookahead_depth, lookahead_iters);
   }
-  return find_greedy_action(initial_node);
+  return find_greedy_action(initial_node_);
 }
 
 double MonteCarloTreeSearch::simulate(std::shared_ptr<MCTSNode> curr_state, const int depth,
@@ -62,7 +65,7 @@ double MonteCarloTreeSearch::simulate(std::shared_ptr<MCTSNode> curr_state, cons
   return q;
 }
 
-std::vector<int> MonteCarloTreeSearch::get_greedy_sequence() const
+std::vector<int> MonteCarloTreeSearch::get_greedy_sequence(bool print_info_matrices) const
 {
   if (initial_node_ == nullptr) {
     return std::vector<int>();
@@ -72,14 +75,21 @@ std::vector<int> MonteCarloTreeSearch::get_greedy_sequence() const
   std::shared_ptr<const MCTSNode> curr_node = initial_node_;
   while (curr_node != nullptr) {
     int best_action = find_greedy_action(curr_node);
-    out.push_back(best_action);
     curr_node = curr_node->get_child(best_action);
+    if (curr_node != nullptr) {
+      out.push_back(best_action);
+
+      if (print_info_matrices) {
+        std::cout << "Action: " << best_action << std::endl;
+        std::cout << curr_node->get_ref_to_problem_info().shared_info_matrix << std::endl;
+      }
+    }
   }
 
   return out;
 }
 
-double lookahead_value_function_estimate(const std::shared_ptr<MCTSNode> curr_state,
+double lookahead_value_function_estimate(const std::shared_ptr<const MCTSNode> curr_state,
                                          const int num_states, const int depth,
                                          const double discount, const int num_iters)
 {
@@ -92,7 +102,7 @@ double lookahead_value_function_estimate(const std::shared_ptr<MCTSNode> curr_st
     auto start_state = std::make_shared<MCTSNode>(*curr_state);
 
     for (int i = 0; i < depth; ++i) {
-      int action = lookahead_get_random_action(curr_state->get_id(), num_states);
+      int action = lookahead_get_random_action(start_state->get_id(), num_states);
       std::shared_ptr<MCTSNode> new_state = transition_from_state(start_state, action);
       average_reward +=
         std::pow(discount, i) * compute_reward_from_transitioning(start_state, new_state);
@@ -104,9 +114,13 @@ double lookahead_value_function_estimate(const std::shared_ptr<MCTSNode> curr_st
 
 int lookahead_get_random_action(const int curr_state, const int num_states)
 {
+  if (num_states <= 1) {
+    return curr_state;
+  }
+
   static std::random_device rd;
   static std::mt19937 generator(rd());
-  std::uniform_int_distribution<> distr(0, num_states);
+  std::uniform_int_distribution<> distr(0, num_states - 1);
   int action{curr_state};
   while (action == curr_state) {
     action = distr(generator);
@@ -120,8 +134,8 @@ std::shared_ptr<MCTSNode> transition_from_state(std::shared_ptr<MCTSNode> curr_n
   return curr_node->take_action(action);
 }
 
-double compute_reward_from_transitioning(const std::shared_ptr<MCTSNode> curr_state,
-                                         const std::shared_ptr<MCTSNode> next_state)
+double compute_reward_from_transitioning(const std::shared_ptr<const MCTSNode> curr_state,
+                                         const std::shared_ptr<const MCTSNode> next_state)
 {
   int curr_state_id{curr_state->get_id()};
   int next_state_id{next_state->get_id()};
@@ -133,7 +147,7 @@ double compute_reward_from_transitioning(const std::shared_ptr<MCTSNode> curr_st
 
 int find_greedy_action(const std::shared_ptr<const MCTSNode> curr_state)
 {
-  return curr_state->explore_best_action();
+  return curr_state->get_greedy_action();
 }
 
 } // namespace eyes_on_guys

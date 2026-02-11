@@ -17,7 +17,6 @@ find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
 find_package(rosidl_default_generators REQUIRED)
-find_package(GTest REQUIRED)
 
 find_package(Matplot++ QUIET)
 if(NOT Matplot++_FOUND)
@@ -102,7 +101,7 @@ add_library(monte_carlo_tree_search
 target_include_directories(monte_carlo_tree_search
   PUBLIC
     include/eyes-on-the-guys)
-target_link_libraries(monte_carlo_tree_search Eigen3::Eigen)
+target_link_libraries(monte_carlo_tree_search PUBLIC Eigen3::Eigen)
 
 ###################
 ##   RESOURCES   ##
@@ -114,6 +113,7 @@ install(
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
+  find_package(GTest REQUIRED)
   # the following line skips the linter which checks for copyrights
   # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)

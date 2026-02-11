@@ -1,5 +1,6 @@
 #include <Eigen/Core>
 #include <gtest/gtest.h>
+#include <limits>
 #include <memory>
 
 #include "monte_carlo_node.hpp"
@@ -94,6 +95,17 @@ TEST(find_best_action, GivenQWithOneZero_ExpectReturnsCorrectAction)
   N_s_a(correct_action) = 0;
 
   int result = eyes_on_guys::find_best_action(id, 11, 1.0, N_s_a, Q_s_a);
+
+  EXPECT_EQ(result, correct_action);
+}
+
+TEST(get_greedy_action, GivenQWithOneZeroValue_ExpectReturnsCorrectAction)
+{
+  Eigen::Matrix<double, 12, 1> Q_s_a = Eigen::Matrix<double, 12, 1>::Ones();
+  int correct_action{4};
+  Q_s_a(correct_action) = 1000;
+
+  int result = eyes_on_guys::find_max_q_value(Q_s_a);
 
   EXPECT_EQ(result, correct_action);
 }

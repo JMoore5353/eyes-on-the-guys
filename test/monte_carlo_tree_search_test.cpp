@@ -12,7 +12,7 @@ namespace eyes_on_guys
 TEST(find_greedy_action, WhenFindingGreedyAction_ExpectTheNodesGreedyAction)
 {
   auto node = std::make_shared<MCTSNode>(0, 10, 1.0);
-  int node_greedy_action = node->explore_best_action();
+  int node_greedy_action = node->get_greedy_action();
 
   int greedy_action = find_greedy_action(node);
 
@@ -39,7 +39,7 @@ TEST(get_random_action, ExpectRandomActionNeverEqualsStateAndIsWithinBounds)
     int action = lookahead_get_random_action(state, num_states);
     EXPECT_NE(action, state);
     EXPECT_GE(action, 0);
-    EXPECT_LE(action, num_states);
+    EXPECT_LT(action, num_states);
   }
 }
 
@@ -49,7 +49,7 @@ public:
   MCTSTwoAgentTest()
       : num_agents{2}
       , initial_state{0}
-      , num_iter{1}
+      , num_iter{10}
       , depth{10}
       , discount_factor{1.0}
       , exploration_bonus{1.0}
@@ -147,7 +147,7 @@ public:
   MCTSThreeAgentTest()
       : num_agents{3}
       , initial_state{0}
-      , num_iter{3}
+      , num_iter{20}
       , depth{3}
       , discount_factor{1.0}
       , exploration_bonus{1.0}
@@ -155,7 +155,6 @@ public:
       , problem_info{num_agents, relay_speed, dist_between_agents}
       , lookahead_depth{0}
       , lookahead_iters{0}
-      , optimal_action{1}
   {}
 
 protected:
@@ -171,6 +170,7 @@ protected:
   int lookahead_depth;
   int lookahead_iters;
   int optimal_action;
+  std::vector<int> optimal_greedy_seq;
 };
 
 class MCTSThreeAgentTestOne : public MCTSThreeAgentTest
@@ -179,23 +179,28 @@ public:
   MCTSThreeAgentTestOne()
   {
     dist_between_agents << 0.0, 10.0, 10.0, 10.0, 0.0, 10., 10., 10., 0.0;
-    problem_info.shared_info_matrix = dist_between_agents;
+    problem_info.distance_between_agents = dist_between_agents;
 
     problem_info.relays_current_info = Eigen::Vector3d{0.0, 100.0, 0.0};
     problem_info.shared_info_matrix = Eigen::MatrixXd::Zero(3, 3);
     problem_info.time_since_last_relay_contact_with_agent = Eigen::Vector3d{0.0, 0.0, 0.0};
+
+    optimal_action = 2;
+    optimal_greedy_seq = {2, 0, 1};
   }
 };
 
-TEST_F(MCTSThreeAgentTestOne, GivenThreeIters_WhenTakingAction_ExpectOptimalActionIs1)
+TEST_F(MCTSThreeAgentTestOne, GivenThreeIters_WhenTakingAction_ExpectOptimalAction)
 {
   MonteCarloTreeSearch tree_searcher{num_agents};
 
-  double action = tree_searcher.search_for_best_action(
-    initial_state, num_iter, depth, discount_factor, exploration_bonus, problem_info,
-    lookahead_depth, lookahead_iters);
+  int action = tree_searcher.search_for_best_action(initial_state, num_iter, depth, discount_factor,
+                                                    exploration_bonus, problem_info,
+                                                    lookahead_depth, lookahead_iters);
+  std::vector<int> greedy_seq = tree_searcher.get_greedy_sequence();
 
   EXPECT_EQ(action, optimal_action);
+  EXPECT_EQ(greedy_seq, optimal_greedy_seq);
 }
 
 class MCTSThreeAgentTestTwo : public MCTSThreeAgentTest
@@ -204,25 +209,62 @@ public:
   MCTSThreeAgentTestTwo()
   {
     dist_between_agents << 0.0, 10.0, 10.0, 10.0, 0.0, 10., 10., 10., 0.0;
-    problem_info.shared_info_matrix = dist_between_agents;
+    problem_info.distance_between_agents = dist_between_agents;
 
     problem_info.relays_current_info = Eigen::Vector3d{100.0, 0.0, 0.0};
     problem_info.shared_info_matrix = Eigen::MatrixXd({{0, 0, 0}, {100, 0, 0}, {0, 0, 0}});
-    problem_info.time_since_last_relay_contact_with_agent = Eigen::Vector3d{0.0, 0.0, 0.0};
+    problem_info.time_since_last_relay_contact_with_agent = Eigen::Vector3d{0.0, 5.0, 0.0};
 
     optimal_action = 2;
+    optimal_greedy_seq = {2, 1, 0};
   }
 };
 
-TEST_F(MCTSThreeAgentTestTwo, GivenThreeIters_WhenTakingAction_ExpectOptimalActionIs2)
+TEST_F(MCTSThreeAgentTestTwo, GivenThreeIters_WhenTakingAction_ExpectOptimalAction)
 {
   MonteCarloTreeSearch tree_searcher{num_agents};
 
-  double action = tree_searcher.search_for_best_action(
-    initial_state, num_iter, depth, discount_factor, exploration_bonus, problem_info,
-    lookahead_depth, lookahead_iters);
+  int action = tree_searcher.search_for_best_action(initial_state, num_iter, depth, discount_factor,
+                                                    exploration_bonus, problem_info,
+                                                    lookahead_depth, lookahead_iters);
+  std::vector<int> greedy_seq = tree_searcher.get_greedy_sequence();
 
   EXPECT_EQ(action, optimal_action);
+  EXPECT_EQ(greedy_seq, optimal_greedy_seq);
+}
+
+TEST_F(MCTSThreeAgentTestTwo, Given1000Iters_WhenTakingAction_ExpectOptimalAction)
+{
+  num_iter = 1000;
+  depth = 10;
+  optimal_greedy_seq = {2, 1, 0, 2, 1, 0, 2, 1, 0, 2};
+  MonteCarloTreeSearch tree_searcher{num_agents};
+
+  int action = tree_searcher.search_for_best_action(initial_state, num_iter, depth, discount_factor,
+                                                    exploration_bonus, problem_info,
+                                                    lookahead_depth, lookahead_iters);
+  std::vector<int> greedy_seq = tree_searcher.get_greedy_sequence();
+
+  EXPECT_EQ(action, optimal_action);
+  EXPECT_EQ(greedy_seq, optimal_greedy_seq);
+}
+
+TEST_F(MCTSThreeAgentTestTwo, GivenManyLookaheadIters_WhenTakingAction_ExpectOptimalAction)
+{
+  // WARN: This feels like a suboptimal test... Since it relies on the law of large numbers and
+  // stochasticity with the lookahead function.
+  lookahead_iters = 1000;
+  lookahead_depth = 2;
+  optimal_greedy_seq = {2, 1, 0};
+  MonteCarloTreeSearch tree_searcher{num_agents};
+
+  int action = tree_searcher.search_for_best_action(initial_state, num_iter, depth, discount_factor,
+                                                    exploration_bonus, problem_info,
+                                                    lookahead_depth, lookahead_iters);
+  std::vector<int> greedy_seq = tree_searcher.get_greedy_sequence();
+
+  EXPECT_EQ(action, optimal_action);
+  EXPECT_EQ(greedy_seq, optimal_greedy_seq);
 }
 
 } // namespace eyes_on_guys

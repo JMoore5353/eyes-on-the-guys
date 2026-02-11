@@ -1,4 +1,6 @@
 #include <Eigen/Core>
+#include <cmath>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -42,7 +44,9 @@ int MCTSNode::explore_best_action() const
   return find_best_action(id_, num_agents_, exploration_bonus_, N_s_a_, Q_s_a_);
 }
 
-bool MCTSNode::has_been_visited() { return node_has_been_visited_; }
+int MCTSNode::get_greedy_action() const { return find_max_q_value(Q_s_a_); }
+
+bool MCTSNode::has_been_visited() const { return node_has_been_visited_; }
 void MCTSNode::visit_node() { node_has_been_visited_ = true; }
 
 std::shared_ptr<MCTSNode> MCTSNode::take_action(const int action)
@@ -87,6 +91,13 @@ int find_best_action(const int & id, const int & num_agents, const double & expl
     }
   }
   return best_action;
+}
+
+int find_max_q_value(const Eigen::VectorXd & Q_s_a)
+{
+  Eigen::Index max_index;
+  Q_s_a.maxCoeff(&max_index);
+  return static_cast<int>(max_index);
 }
 
 double get_ucb1_bound(const int & action, const double & exploration_bonus,
