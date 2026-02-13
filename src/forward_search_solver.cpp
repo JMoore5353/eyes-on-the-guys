@@ -42,9 +42,13 @@ void ForwardSearchSolver::pose_callback(const geometry_msgs::msg::PoseStamped & 
 {
   const std::string & id = msg.header.frame_id;
 
-  GuyState guy_state(msg);
-  auto inserted = guy_states_by_id_.insert_or_assign(id, guy_state);
-  bool is_inserted = inserted.second;
+  auto it = guy_states_by_id_.find(id);
+  bool is_inserted = (it == guy_states_by_id_.end());
+  if (is_inserted) {
+    guy_states_by_id_.emplace(id, GuyState(msg));
+  } else {
+    it->second.pose = msg;
+  }
   if (is_inserted) {
     ids_.push_back(id);
   }
@@ -53,7 +57,14 @@ void ForwardSearchSolver::pose_callback(const geometry_msgs::msg::PoseStamped & 
 void ForwardSearchSolver::bits_callback(const eyes_on_the_guys::msg::Bit & msg)
 {
   const std::string & id = msg.header.frame_id;
-  guy_states_by_id_[id].bits = msg.bits;
+  auto & guy_state = guy_states_by_id_[id];
+  const double stamp_sec = rclcpp::Time(msg.header.stamp).seconds();
+  if (guy_state.last_bits_update_sec >= 0.0 && stamp_sec > guy_state.last_bits_update_sec) {
+    const double dt = stamp_sec - guy_state.last_bits_update_sec;
+    guy_state.bits_rate = static_cast<float>((msg.bits - guy_state.bits) / dt);
+  }
+  guy_state.bits = msg.bits;
+  guy_state.last_bits_update_sec = stamp_sec;
 }
 
 void ForwardSearchSolver::search_callback(
@@ -89,6 +100,13 @@ void ForwardSearchSolver::search_callback(
   
   current_state_.relay_info = Eigen::VectorXd::Zero(size);
   current_state_.relay_info(starting_guy) = guy_states_by_id_[starting_id].bits;
+  current_state_.guy_bits = Eigen::VectorXd::Zero(size);
+  current_state_.guy_bits_rate = Eigen::VectorXd::Zero(size);
+  for (int i = 0; i < size; ++i) {
+    const std::string & id = ids_.at(static_cast<size_t>(i));
+    current_state_.guy_bits(i) = guy_states_by_id_[id].bits;
+    current_state_.guy_bits_rate(i) = guy_states_by_id_[id].bits_rate;
+  }
 
   current_state_.relay_time_since_visit = Eigen::VectorXd::Ones(size);
   current_state_.relay_time_since_visit *= 1'000.; // TODO: Don't hard code this.
@@ -99,16 +117,19 @@ void ForwardSearchSolver::search_callback(
   current_state_.value = 0.0;
 
   ActionSequence best_seqeuence = forward_search(depth, current_state_);
+  auto format_with_start = [](const std::string & start_id, const ActionSequence & sequence) {
+    std::ostringstream seq_stream;
+    seq_stream << start_id;
+    for (const auto & action : sequence.sequence) {
+      seq_stream << " -> " << action.who_to_go_to;
+    }
+    return seq_stream.str();
+  };
 
   RCLCPP_INFO_STREAM(this->get_logger(), "THE SEARCH IS CONCLUDED.");
-  std::ostringstream seq_stream;
-  for (size_t i = 0; i < best_seqeuence.sequence.size(); ++i) {
-    if (i > 0) {
-      seq_stream << " -> ";
-    }
-    seq_stream << best_seqeuence.sequence[i].who_to_go_to;
-  }
-  RCLCPP_INFO_STREAM(this->get_logger(), "THE BEST SEQUENCE IS: " << seq_stream.str());
+  RCLCPP_INFO_STREAM(
+    this->get_logger(),
+    "THE BEST SEQUENCE IS: " << format_with_start(starting_id, best_seqeuence));
   RCLCPP_INFO_STREAM(this->get_logger(), "WITH A VALUE OF: " << best_seqeuence.total_value); // LOOK AT ME CODEX!!!
 
   response->success = true;
@@ -116,6 +137,14 @@ void ForwardSearchSolver::search_callback(
 
 ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int depth, State state)
 {
+  auto format_with_start = [](const std::string & start_id, const ActionSequence & sequence) {
+    std::ostringstream seq_stream;
+    seq_stream << start_id;
+    for (const auto & action : sequence.sequence) {
+      seq_stream << " -> " << action.who_to_go_to;
+    }
+    return seq_stream.str();
+  };
 
   RCLCPP_INFO_STREAM(this->get_logger(), "One layer deeper");
   
@@ -154,13 +183,6 @@ ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int dept
       continue;
     }
     
-    RCLCPP_INFO_STREAM(this->get_logger(), "ABOUT TO update info");
-    new_state.relay_info(next_index) = guy_states_by_id_[id].bits;
-    new_state.shared_info_matrix.row(current_index) = new_state.relay_info.transpose();
-    new_state.shared_info_matrix(current_index, current_index) = 0.0;
-    RCLCPP_INFO_STREAM(this->get_logger(), "relay_info: " << new_state.relay_info);
-    RCLCPP_INFO_STREAM(this->get_logger(), "INFO MATRIX: " << new_state.shared_info_matrix);
-  
     GuyState current_guy_state = guy_states_by_id_[state.current_guy];
     GuyState next_guy_state = guy_states_by_id_[id];
   
@@ -170,6 +192,14 @@ ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int dept
 
     new_state.relay_time_since_visit.array() += time_to_take_action;
     new_state.relay_time_since_visit(next_index) = 0.0;
+    new_state.guy_bits.array() += new_state.guy_bits_rate.array() * time_to_take_action;
+
+    RCLCPP_INFO_STREAM(this->get_logger(), "ABOUT TO update info");
+    new_state.relay_info(next_index) = new_state.guy_bits(next_index);
+    new_state.shared_info_matrix.row(current_index) = new_state.relay_info.transpose();
+    new_state.shared_info_matrix(current_index, current_index) = 0.0;
+    RCLCPP_INFO_STREAM(this->get_logger(), "relay_info: " << new_state.relay_info);
+    RCLCPP_INFO_STREAM(this->get_logger(), "INFO MATRIX: " << new_state.shared_info_matrix);
 
     RCLCPP_INFO_STREAM(this->get_logger(), "ABOUT TO CALCULATE REWARD");
 
@@ -181,27 +211,17 @@ ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int dept
     action_sequence.sequence.insert(action_sequence.sequence.begin(), new_action);
     action_sequence.total_value = reward + gamma * action_sequence.total_value;
 
-    std::ostringstream action_seq_stream;
-    for (size_t i = 0; i < action_sequence.sequence.size(); ++i) {
-      if (i > 0) {
-        action_seq_stream << " -> ";
-      }
-      action_seq_stream << action_sequence.sequence[i].who_to_go_to;
-    }
-    RCLCPP_INFO_STREAM(this->get_logger(), "CANDIDATE SEQUENCE: " << action_seq_stream.str());
+    RCLCPP_INFO_STREAM(
+      this->get_logger(),
+      "CANDIDATE SEQUENCE: " << format_with_start(state.current_guy, action_sequence));
     RCLCPP_INFO_STREAM(this->get_logger(), "CANDIDATE VALUE: " << action_sequence.total_value);
 
     if (action_sequence.total_value > best_action_sequence.total_value)
     {
       best_action_sequence = action_sequence;
-      std::ostringstream best_seq_stream;
-      for (size_t i = 0; i < best_action_sequence.sequence.size(); ++i) {
-        if (i > 0) {
-          best_seq_stream << " -> ";
-        }
-        best_seq_stream << best_action_sequence.sequence[i].who_to_go_to;
-      }
-      RCLCPP_INFO_STREAM(this->get_logger(), "BEST ACTION SEQUENCE: " << best_seq_stream.str());
+      RCLCPP_INFO_STREAM(
+        this->get_logger(),
+        "BEST ACTION SEQUENCE: " << format_with_start(state.current_guy, best_action_sequence));
       RCLCPP_INFO_STREAM(this->get_logger(), "BEST ACTION SEQUENCE VALUE: " << best_action_sequence.total_value);
     }
 
@@ -288,9 +308,6 @@ double ForwardSearchSolver::roll_out(State state)
 
       State next_state = rollout_state;
       next_state.current_guy = next_id;
-      next_state.relay_info(next_index) = guy_states_by_id_[next_id].bits;
-      next_state.shared_info_matrix.row(current_index) = next_state.relay_info.transpose();
-      next_state.shared_info_matrix(current_index, current_index) = 0.0;
 
       const GuyState current_guy_state = guy_states_by_id_[rollout_state.current_guy];
       const GuyState next_guy_state = guy_states_by_id_[next_id];
@@ -299,6 +316,10 @@ double ForwardSearchSolver::roll_out(State state)
 
       next_state.relay_time_since_visit.array() += time_to_take_action;
       next_state.relay_time_since_visit(next_index) = 0.0;
+      next_state.guy_bits.array() += next_state.guy_bits_rate.array() * time_to_take_action;
+      next_state.relay_info(next_index) = next_state.guy_bits(next_index);
+      next_state.shared_info_matrix.row(current_index) = next_state.relay_info.transpose();
+      next_state.shared_info_matrix(current_index, current_index) = 0.0;
       next_state.value = reward + gamma * rollout_state.value;
 
       rollout_state = next_state;

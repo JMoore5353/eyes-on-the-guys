@@ -27,6 +27,8 @@ private:
   {
     geometry_msgs::msg::PoseStamped pose;
     float bits = 0.0f;
+    float bits_rate = 0.0f;
+    double last_bits_update_sec = -1.0;
 
     GuyState(geometry_msgs::msg::PoseStamped msg) : pose(msg), bits(0.0f) {}
     GuyState() : pose(geometry_msgs::msg::PoseStamped()), bits(0.0f) {}
@@ -56,6 +58,8 @@ private:
     Eigen::MatrixXd shared_info_matrix;
     Eigen::VectorXd relay_info;
     Eigen::VectorXd relay_time_since_visit;
+    Eigen::VectorXd guy_bits;
+    Eigen::VectorXd guy_bits_rate;
     double value;
   };
 
