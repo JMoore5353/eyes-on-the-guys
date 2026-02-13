@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
@@ -114,6 +115,23 @@ target_include_directories(monte_carlo_tree_search
   PUBLIC
     include/eyes-on-the-guys)
 target_link_libraries(monte_carlo_tree_search PUBLIC Eigen3::Eigen)
+
+###############
+##  SOLVERS  ##
+###############
+
+add_executable(forward_search
+  src/forward_search_solver.cpp)
+target_include_directories(forward_search
+  PRIVATE
+    include/eyes-on-the-guys)
+ament_target_dependencies(forward_search rclcpp geometry_msgs std_srvs Eigen3)
+rosidl_target_interfaces(forward_search
+  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+install(
+  TARGETS forward_search
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 ###################
 ##   RESOURCES   ##
