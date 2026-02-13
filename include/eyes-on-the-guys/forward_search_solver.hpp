@@ -47,11 +47,6 @@ private:
     double total_value;
   };
 
-  struct SharedInfo
-  {
-    std::map<std::string, GuyState> guy_states_by_id_;
-  };
-  
   struct State 
   {
     std::string current_guy;
@@ -69,12 +64,23 @@ private:
     const std::shared_ptr<std_srvs::srv::Trigger::Request> request,
     std::shared_ptr<std_srvs::srv::Trigger::Response> response);
   ActionSequence forward_search(int depth, State state);
-  double reward_function(State state, Action action);
-  double roll_out(State State);
+  double reward_function(const State & state, const Action & action) const;
+  double roll_out(const State & state);
   double compute_dubins_path_length(float start_n, float start_e, float start_chi,
                                            float end_n, float end_e, float end_chi);
-  double calculate_path_length(GuyState current_guy_state, GuyState next_guy_state);
+  double calculate_path_length(const GuyState & current_guy_state, const GuyState & next_guy_state) const;
   int index_for_id(const std::string & id) const;
+  std::string format_sequence_with_start(const std::string & start_id, const ActionSequence & sequence) const;
+  std::vector<std::string> action_candidates(const std::string & current_guy) const;
+  State make_initial_state(const std::string & starting_id, int starting_index, int size) const;
+  bool apply_action_transition(
+    const State & state,
+    const std::string & next_id,
+    double gamma,
+    double vel,
+    State & next_state,
+    double & reward,
+    bool emit_debug_logs) const;
 
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr pose_sub_;
   rclcpp::Subscription<eyes_on_the_guys::msg::Bit>::SharedPtr bits_sub_;
@@ -82,8 +88,6 @@ private:
 
   std::map<std::string, GuyState> guy_states_by_id_;
   std::vector<std::string> ids_;
-  std::vector<float> current_bits_;
-  ActionSequence best_;
   State current_state_;
 };
 
