@@ -91,6 +91,17 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(rviz_waypoint_only_publisher
+  src/rviz_waypoint_only_publisher.cpp)
+target_include_directories(rviz_waypoint_only_publisher
+  PRIVATE
+    include/eyes-on-the-guys)
+ament_target_dependencies(rviz_waypoint_only_publisher rclcpp visualization_msgs rosplane_msgs)
+install(
+  TARGETS rviz_waypoint_only_publisher
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ###################
 ##   LIBRARIES   ##
 ###################

@@ -25,16 +25,16 @@ def generate_launch_description():
         'estimator.yaml'
     )
 
-    # Eyes-on-the-guys nodes
+    # eyes_on_the_guys nodes
     rviz_guys_publisher = Node(
-        package="eyes-on-the-guys",
+        package="eyes_on_the_guys",
         executable="rviz_publisher",
         name="rviz_guys_publisher",
         output="screen",
     )
 
     guys_sim = Node(
-        package="eyes-on-the-guys",
+        package="eyes_on_the_guys",
         executable="guys",
         name="guy_sim",
         output="screen",
@@ -44,7 +44,7 @@ def generate_launch_description():
     )
 
     planner = Node(
-        package="eyes-on-the-guys",
+        package="eyes_on_the_guys",
         executable="planner",
         name="planner",
         output="screen",
@@ -98,7 +98,7 @@ def generate_launch_description():
     )
 
     eyes_on_guys_package_share_location = get_package_share_directory(
-        "eyes-on-the-guys"
+        "eyes_on_the_guys"
     )
     simulator_launch_include = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -118,6 +118,12 @@ def generate_launch_description():
         }.items(),
     )
 
+    rviz_waypoint_publisher = Node(
+        package='eyes_on_the_guys',
+        executable='rviz_waypoint_only_publisher',
+        output='screen',
+    )
+
     return LaunchDescription([
         launch.actions.DeclareLaunchArgument(
             "use_sim_time",
@@ -131,5 +137,6 @@ def generate_launch_description():
         path_follower,
         path_manager,
         estimator,
-        simulator_launch_include
+        simulator_launch_include,
+        rviz_waypoint_publisher,
     ])

@@ -57,7 +57,7 @@ void RvizPublisher::add_new_marker_to_guy_vector(const std::string & name)
   new_marker.lifetime.sec = 0;
   new_marker.lifetime.nanosec = 0;
   new_marker.mesh_resource =
-    "package://eyes-on-the-guys/" + this->get_parameter("guy_model_file").as_string();
+    "package://eyes_on_the_guys/" + this->get_parameter("guy_model_file").as_string();
 
   guy_marker_vector_.push_back(new_marker);
 }
