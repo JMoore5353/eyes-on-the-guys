@@ -42,7 +42,7 @@ void RvizPublisher::guy_pose_callback(const geometry_msgs::msg::PoseStamped & ms
 void RvizPublisher::add_new_marker_to_guy_vector(const std::string & name)
 {
   visualization_msgs::msg::Marker new_marker;
-  new_marker.header.frame_id = "world";
+  new_marker.header.frame_id = "NED";
   new_marker.ns = name;
   new_marker.id = 0;
   new_marker.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
