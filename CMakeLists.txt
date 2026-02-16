@@ -108,7 +108,8 @@ install(
 add_library(monte_carlo_tree_search
   src/eyes_on_guys_problem.cpp
   src/monte_carlo_node.cpp
-  src/monte_carlo_tree_search.cpp)
+  src/monte_carlo_tree_search.cpp
+  src/branch_and_bound_solver.cpp)
 target_include_directories(monte_carlo_tree_search
   PUBLIC
     include/eyes-on-the-guys)
@@ -137,7 +138,8 @@ if(BUILD_TESTING)
   add_executable(unit_tests
     test/monte_carlo_node_test.cpp
     test/monte_carlo_tree_search_test.cpp
-    test/eyes_on_guys_problem_test.cpp)
+    test/eyes_on_guys_problem_test.cpp
+    test/branch_and_bound_solver_test.cpp)
   target_include_directories(unit_tests
     PRIVATE
       ${GTEST_INCLUDE_DIRS})

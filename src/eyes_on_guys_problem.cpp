@@ -75,12 +75,26 @@ double compute_reward_model(const int curr_state, const int next_state,
   double beta{1.0};
   double zeta{1.0};
 
+  // Mathematically equivalent to ||curr_state.relay_info - curr_state.shared_info_matrix.row(action)||_2
+  // with action information set to 0. Not setting action to 0 adds an additional incentive to
+  // visit agents with longer times since last visit by adding a delta_time into the 2-norm.
+  // Already incentivizes visiting agents with longer times since last visit though, as these agents
+  // will have more information to gain.
+  //
+  // In a way, this incentivizes very long trips as more time means more information generated.
+  // So, we need something to shift the utility from "maximum information shared with a given number
+  // of actions" to "maximum information shared within a given time frame" (distance and time penalties).
   Eigen::MatrixXd delta_shared_info =
     next_state_info.shared_info_matrix - curr_state_info.shared_info_matrix;
   double shared_info_reward = gamma * delta_shared_info.norm();
 
+  // Discourages long trips. Without this, information matrix would bias decision towards long, sequential
+  // trips among the group (I think)
   double distance_penalty = beta * curr_state_info.distance_between_agents(curr_state, next_state);
 
+  // Mathematically equivalent to (time to take action)*(number of possible actions - 1) - action last visit time.
+  // Discourages long trips as well, as action time is weighted substantially heavier than time since last visit.
+  // This might be redundant with the distance penalty.
   Eigen::VectorXd delta_time_since_last_contact =
     next_state_info.time_since_last_relay_contact_with_agent
     - curr_state_info.time_since_last_relay_contact_with_agent;
