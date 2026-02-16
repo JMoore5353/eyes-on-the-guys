@@ -4,6 +4,7 @@
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rcl_interfaces/msg/parameter_descriptor.hpp>
 #include <rosplane_msgs/msg/state.hpp>
 #include <rosplane_msgs/msg/waypoint.hpp>
 
@@ -52,6 +53,13 @@ void Planner::declare_parameters()
   this->declare_parameter("planning_rate_hz", 1.0);
   this->declare_parameter("R_min", 50.0);
   this->declare_parameter("communication_radius", 25.0);
+  this->declare_parameter("selection_algorithm", "sequential");
+  this->declare_parameter("mcts_num_iter", 100);
+  this->declare_parameter("mcts_depth", 7);
+  this->declare_parameter("mcts_discount_factor", 0.9);
+  this->declare_parameter("mcts_exploration_bonus", 100.0);
+  this->declare_parameter("mcts_lookahead_depth", 5);
+  this->declare_parameter("mcts_lookahead_iters", 30);
 }
 
 void Planner::eyes_state_callback(const rosplane_msgs::msg::State & msg)
@@ -157,42 +165,24 @@ void Planner::select_new_target_guy()
     names += name + " ";
   }
 
-  int num_agents = guy_poses_.size();
-  double curr_speed = std::max(std::sqrt(current_eyes_state_.v_x * current_eyes_state_.v_x +
-                                current_eyes_state_.v_y * current_eyes_state_.v_y +
-                                current_eyes_state_.v_z * current_eyes_state_.v_z), 15.0f);
-  Eigen::MatrixXd distance_between_agents = compute_distance_between_guys(guy_names, guy_poses_);
-  EyesOnGuysProblem problem_info{num_agents, curr_speed, distance_between_agents};
+  std::string selection_algorithm = this->get_parameter("selection_algorithm").as_string();
+  if (selection_algorithm == "mcts") {
+    current_target_guy_ = find_next_guy_with_mcts(guy_names);
+  } else if (selection_algorithm == "branch_and_bound") {
+    current_target_guy_ = find_next_guy_with_branch_and_bound(guy_names);
+  } else if (selection_algorithm == "forward_search") {
+    current_target_guy_ = find_next_guy_with_forward_search(guy_names);
+  } else if (selection_algorithm == "sequential") {
+    current_target_guy_ = find_next_guy_sequentially(guy_names);
+  } else {
+    RCLCPP_WARN(this->get_logger(),
+                "Unable to parse selection_algorithm type %s! Defaulting to 'sequential'!",
+                selection_algorithm.c_str());
+    current_target_guy_ = find_next_guy_sequentially(guy_names);
+  }
 
-  std::vector<std::string>::iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
-  int initial_state = std::distance(guy_names.begin(), it);
-  RCLCPP_INFO_STREAM(this->get_logger(), "Name: " << current_target_guy_.c_str() << " Index: " << initial_state);
-  int num_iter{100};
-  int depth{7};
-  double discount_factor{0.9};
-  double exploration_bonus{100.0};
-  int lookahead_depth{0};
-  int lookahead_iters{0};
-
-  MonteCarloTreeSearch tree_searcher{num_agents};
-  int optimal_action = tree_searcher.search_for_best_action(initial_state,
-                                                            num_iter,
-                                                            depth,
-                                                            discount_factor,
-                                                            exploration_bonus,
-                                                            problem_info,
-                                                            lookahead_depth,
-                                                            lookahead_iters);
-  std::vector<int> greedy_sequence = tree_searcher.get_greedy_sequence();
-  optimal_action = greedy_sequence.at(0);
-
-  // Iterate through guys sequentially
-  // current_guy_index_ = current_guy_index_ % guy_names.size();
-  current_target_guy_ = guy_names[optimal_action];
-  // current_guy_index_++;
   has_target_ = true;
-
-  RCLCPP_INFO(this->get_logger(), "Selected new target: %s, using optimal action %i from list [%s]", current_target_guy_.c_str(), optimal_action, names.c_str());
+  RCLCPP_INFO(this->get_logger(), "Selected new target: %s", current_target_guy_.c_str());
 }
 
 double Planner::compute_horizontal_distance_to_target()
@@ -386,6 +376,54 @@ double Planner::compute_dubins_path_length(float start_n, float start_e, float s
   if (L4 < L) L = L4;
 
   return static_cast<double>(L);
+}
+
+std::string Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
+{
+  int num_agents = static_cast<int>(guy_names.size());
+  EyesOnGuysProblem initial_problem_info = compute_initial_problem_information(guy_names);
+
+  std::vector<std::string>::const_iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
+  int initial_state = std::distance(guy_names.begin(), it);
+
+  MonteCarloTreeSearch tree_searcher{num_agents};
+  int optimal_action = tree_searcher.search_for_best_action(initial_state,
+                                                            this->get_parameter("mcts_num_iter").as_int(),
+                                                            this->get_parameter("mcts_depth").as_int(),
+                                                            this->get_parameter("mcts_discount_factor").as_double(),
+                                                            this->get_parameter("mcts_exploration_bonus").as_double(),
+                                                            initial_problem_info,
+                                                            this->get_parameter("mcts_lookahead_depth").as_int(),
+                                                            this->get_parameter("mcts_lookahead_iters").as_int());
+
+  return guy_names.at(optimal_action);
+}
+
+std::string Planner::find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names)
+{
+  return find_next_guy_sequentially(guy_names);
+}
+
+std::string Planner::find_next_guy_with_forward_search(const std::vector<std::string>& guy_names)
+{
+  return find_next_guy_sequentially(guy_names);
+}
+
+std::string Planner::find_next_guy_sequentially(const std::vector<std::string>& guy_names)
+{
+  current_guy_index_ = current_guy_index_ % guy_names.size();
+  return guy_names[current_guy_index_++];
+}
+
+EyesOnGuysProblem Planner::compute_initial_problem_information(const std::vector<std::string>& guy_names) const
+{
+  int num_agents = guy_poses_.size();
+  double curr_speed = std::max(std::sqrt(current_eyes_state_.v_x * current_eyes_state_.v_x +
+                                         current_eyes_state_.v_y * current_eyes_state_.v_y +
+                                         current_eyes_state_.v_z * current_eyes_state_.v_z), 15.0f);
+  Eigen::MatrixXd distance_between_agents = compute_distance_between_guys(guy_names, guy_poses_);
+
+  return EyesOnGuysProblem{num_agents, curr_speed, distance_between_agents};
 }
 
 Eigen::MatrixXd compute_distance_between_guys(const std::vector<std::string>& guy_names,

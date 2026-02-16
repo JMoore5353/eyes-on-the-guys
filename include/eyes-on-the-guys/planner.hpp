@@ -1,6 +1,7 @@
 #ifndef PLANNER_HPP
 #define PLANNER_HPP
 
+#include "eyes_on_guys_problem.hpp"
 #include <Eigen/Eigen>
 #include <cmath>
 #include <map>
@@ -76,6 +77,40 @@ private:
   float mo(float in);
 
   void declare_parameters();
+
+  /**
+  * Uses MCTS to compute the next guy to fly to
+  *
+  * @param guy_names Vector of names of the guys (sorted in alphabetical order)
+  * @return The name of the guy to fly to
+  */
+  std::string find_next_guy_with_mcts(const std::vector<std::string>& guy_names);
+
+  /**
+  * Uses Branch and Bound to compute the next guy to fly to
+  *
+  * @param guy_names Vector of names of the guys (sorted in alphabetical order)
+  * @return The name of the guy to fly to
+  */
+  std::string find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names);
+
+  /**
+  * Uses forward search to compute the next guy to fly to
+  *
+  * @param guy_names Vector of names of the guys (sorted in alphabetical order)
+  * @return The name of the guy to fly to
+  */
+  std::string find_next_guy_with_forward_search(const std::vector<std::string>& guy_names);
+
+  /**
+  * Sequentially iterates through the guy names
+  *
+  * @param guy_names Vector of names of the guys (sorted in alphabetical order)
+  * @return The name of the guy to fly to
+  */
+  std::string find_next_guy_sequentially(const std::vector<std::string>& guy_names);
+
+  EyesOnGuysProblem compute_initial_problem_information(const std::vector<std::string>& guy_names) const;
 };
 
 Eigen::MatrixXd compute_distance_between_guys(const std::vector<std::string>& guy_names,

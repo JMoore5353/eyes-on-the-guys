@@ -42,7 +42,6 @@ std::shared_ptr<MCTSNode> transition_from_state(std::shared_ptr<MCTSNode> curr_n
                                                 const int action);
 double compute_reward_from_transitioning(const std::shared_ptr<const MCTSNode> curr_state,
                                          const std::shared_ptr<const MCTSNode> next_state);
-int find_greedy_action(const std::shared_ptr<const MCTSNode> curr_state);
 
 } // namespace eyes_on_guys
 
