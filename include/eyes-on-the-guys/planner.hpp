@@ -78,6 +78,9 @@ private:
   void declare_parameters();
 };
 
+Eigen::MatrixXd compute_distance_between_guys(const std::vector<std::string>& guy_names,
+                                              const std::map<std::string, geometry_msgs::msg::PoseStamped>& guy_poses);
+
 } // namespace eyes_on_guys
 
 #endif

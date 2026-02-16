@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <functional>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
@@ -7,6 +8,8 @@
 #include <rosplane_msgs/msg/waypoint.hpp>
 
 #include "planner.hpp"
+#include "monte_carlo_tree_search.hpp"
+#include "eyes_on_guys_problem.hpp"
 
 using namespace std::chrono_literals;
 
@@ -16,6 +19,7 @@ namespace eyes_on_guys
 Planner::Planner()
     : Node("planner")
     , eyes_state_received_(false)
+    , current_target_guy_{""}
     , has_target_(false)
     , current_guy_index_(0)
 {
@@ -139,19 +143,56 @@ void Planner::select_new_target_guy()
     return;
   }
 
-  // Build vector of guy names
-  std::vector<std::string> guy_names;
-  for (const auto& [name, pose] : guy_poses_) {
-    guy_names.push_back(name);
+  if (current_target_guy_ == "") {
+    current_target_guy_ = guy_poses_.begin()->first;
   }
 
+  // Build vector of guy names
+  std::vector<std::string> guy_names;
+  std::string names = "";
+  for (const auto& [name, pose] : guy_poses_) {
+    // Iterators of std::map iterate in ascending order of keys, so
+    // this is already in order (no need to sort)
+    guy_names.push_back(name);
+    names += name + " ";
+  }
+
+  int num_agents = guy_poses_.size();
+  double curr_speed = std::max(std::sqrt(current_eyes_state_.v_x * current_eyes_state_.v_x +
+                                current_eyes_state_.v_y * current_eyes_state_.v_y +
+                                current_eyes_state_.v_z * current_eyes_state_.v_z), 15.0f);
+  Eigen::MatrixXd distance_between_agents = compute_distance_between_guys(guy_names, guy_poses_);
+  EyesOnGuysProblem problem_info{num_agents, curr_speed, distance_between_agents};
+
+  std::vector<std::string>::iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
+  int initial_state = std::distance(guy_names.begin(), it);
+  RCLCPP_INFO_STREAM(this->get_logger(), "Name: " << current_target_guy_.c_str() << " Index: " << initial_state);
+  int num_iter{100};
+  int depth{7};
+  double discount_factor{0.9};
+  double exploration_bonus{100.0};
+  int lookahead_depth{0};
+  int lookahead_iters{0};
+
+  MonteCarloTreeSearch tree_searcher{num_agents};
+  int optimal_action = tree_searcher.search_for_best_action(initial_state,
+                                                            num_iter,
+                                                            depth,
+                                                            discount_factor,
+                                                            exploration_bonus,
+                                                            problem_info,
+                                                            lookahead_depth,
+                                                            lookahead_iters);
+  std::vector<int> greedy_sequence = tree_searcher.get_greedy_sequence();
+  optimal_action = greedy_sequence.at(0);
+
   // Iterate through guys sequentially
-  current_guy_index_ = current_guy_index_ % guy_names.size();
-  current_target_guy_ = guy_names[current_guy_index_];
-  current_guy_index_++;
+  // current_guy_index_ = current_guy_index_ % guy_names.size();
+  current_target_guy_ = guy_names[optimal_action];
+  // current_guy_index_++;
   has_target_ = true;
 
-  RCLCPP_INFO(this->get_logger(), "Selected new target: %s", current_target_guy_.c_str());
+  RCLCPP_INFO(this->get_logger(), "Selected new target: %s, using optimal action %i from list [%s]", current_target_guy_.c_str(), optimal_action, names.c_str());
 }
 
 double Planner::compute_horizontal_distance_to_target()
@@ -173,7 +214,7 @@ void Planner::plot_state()
   auto fig = gcf();
   fig->quiet_mode(true);
   cla();
-  
+
   // Define colors for guys (cycle through a color palette) - must be float arrays
   std::vector<std::array<float, 3>> colors = {
     {0.12f, 0.47f, 0.71f},  // blue
@@ -187,16 +228,16 @@ void Planner::plot_state()
     {0.74f, 0.74f, 0.13f},  // olive
     {0.09f, 0.75f, 0.81f}   // cyan
   };
-  
+
   size_t color_idx = 0;
-  
+
   // Plot each guy
   for (const auto& [name, pose] : guy_poses_) {
     std::vector<double> x = {pose.pose.position.x};
     std::vector<double> y = {pose.pose.position.y};
-    
+
     const auto& color = colors[color_idx % colors.size()];
-    
+
     if (has_target_ && name == current_target_guy_) {
       // Selected guy: square marker
       auto s = scatter(x, y);
@@ -214,22 +255,22 @@ void Planner::plot_state()
       s->marker_face_color(color);
       s->display_name(name);
     }
-    
+
     hold(on);
     color_idx++;
   }
-  
+
   // Plot UAV as black triangle
   std::vector<double> uav_x = {current_eyes_state_.p_n};
   std::vector<double> uav_y = {current_eyes_state_.p_e};
-  
+
   auto uav = scatter(uav_x, uav_y);
   uav->marker(line_spec::marker_style::upward_pointing_triangle);
   uav->marker_size(12);
   uav->marker_color({0.0f, 0.0f, 0.0f});
   uav->marker_face_color({0.0f, 0.0f, 0.0f});
   uav->display_name("UAV");
-  
+
   xlabel("North (m)");
   ylabel("East (m)");
   title("Eyes on the Guys - UAV Tracking");
@@ -238,7 +279,7 @@ void Planner::plot_state()
   axis(equal);
   xlim({-600, 600});
   ylim({-600, 600});
-  
+
   fig->draw();
 }
 
@@ -345,6 +386,31 @@ double Planner::compute_dubins_path_length(float start_n, float start_e, float s
   if (L4 < L) L = L4;
 
   return static_cast<double>(L);
+}
+
+Eigen::MatrixXd compute_distance_between_guys(const std::vector<std::string>& guy_names,
+                                              const std::map<std::string, geometry_msgs::msg::PoseStamped>& guy_poses)
+{
+  std::size_t num_agents = guy_poses.size();
+  Eigen::MatrixXd distance_between_agents = Eigen::MatrixXd::Zero(num_agents, num_agents);
+
+  for (std::size_t i=0; i<num_agents; ++i) {
+    std::string ith_guy_name = guy_names.at(i);
+
+    for (std::size_t j=i+1; j<num_agents; ++j) {
+      std::string jth_guy_name = guy_names.at(j);
+
+      double x_dist = guy_poses.at(ith_guy_name).pose.position.x - guy_poses.at(jth_guy_name).pose.position.x;
+      double y_dist = guy_poses.at(ith_guy_name).pose.position.y - guy_poses.at(jth_guy_name).pose.position.y;
+      double z_dist = guy_poses.at(ith_guy_name).pose.position.z - guy_poses.at(jth_guy_name).pose.position.z;
+      double dist = std::sqrt(x_dist * x_dist + y_dist * y_dist + z_dist * z_dist);
+
+      distance_between_agents(i,j) = dist;
+      distance_between_agents(j,i) = dist;
+    }
+  }
+
+  return distance_between_agents;
 }
 
 } // namespace eyes_on_guys

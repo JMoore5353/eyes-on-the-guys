@@ -147,6 +147,7 @@ double compute_reward_from_transitioning(const std::shared_ptr<const MCTSNode> c
 
 int find_greedy_action(const std::shared_ptr<const MCTSNode> curr_state)
 {
+  // TODO: Replace this with a call to get_greedy_sequence...
   return curr_state->get_greedy_action();
 }
 

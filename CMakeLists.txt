@@ -85,6 +85,7 @@ if(Matplot++_FOUND)
 else()
   target_link_libraries(planner matplot)
 endif()
+target_link_libraries(planner monte_carlo_tree_search)
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
@@ -137,7 +138,10 @@ if(BUILD_TESTING)
   add_executable(unit_tests
     test/monte_carlo_node_test.cpp
     test/monte_carlo_tree_search_test.cpp
-    test/eyes_on_guys_problem_test.cpp)
+    test/eyes_on_guys_problem_test.cpp
+    test/planner_test.cpp
+    src/planner.cpp
+  )
   target_include_directories(unit_tests
     PRIVATE
       ${GTEST_INCLUDE_DIRS})
@@ -146,6 +150,12 @@ if(BUILD_TESTING)
     GTest::Main
     monte_carlo_tree_search
   )
+  if(Matplot++_FOUND)
+    target_link_libraries(unit_tests Matplot++::matplot)
+  else()
+    target_link_libraries(unit_tests matplot)
+  endif()
+  ament_target_dependencies(unit_tests rclcpp geometry_msgs rosplane_msgs Eigen3)
 endif()
 
 ament_package()
