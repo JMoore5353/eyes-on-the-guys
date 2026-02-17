@@ -63,40 +63,6 @@ TEST_F(BranchAndBoundTest, OrderingsAreCorrect_Umax)
   EXPECT_FLOAT_EQ((*it)->u_max, 5.0F);
 }
 
-TEST_F(BranchAndBoundTest, OrderingsAreCorrect_Umin)
-{
-  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
-
-  std::multiset<BranchAndBoundSolver::NodePtr, BranchAndBoundSolver::UMinComparator> nodes;
-
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    3.0F, 0.0F, std::vector<int>{1}, 0.0F, curr_state, 0, problem, 4U));
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    1.0F, 0.0F, std::vector<int>{2}, 0.0F, curr_state, 0, problem, 2U));
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    2.0F, 0.0F, std::vector<int>{3}, 0.0F, curr_state, 0, problem, 3U));
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    1.0F, 0.0F, std::vector<int>{4}, 0.0F, curr_state, 0, problem, 1U));
-
-  ASSERT_EQ(nodes.size(), 4U);
-
-  auto it = nodes.begin();
-  EXPECT_EQ((*it)->id, 1U);
-  EXPECT_FLOAT_EQ((*it)->u_min, 1.0F);
-
-  ++it;
-  EXPECT_EQ((*it)->id, 2U);
-  EXPECT_FLOAT_EQ((*it)->u_min, 1.0F);
-
-  ++it;
-  EXPECT_EQ((*it)->id, 3U);
-  EXPECT_FLOAT_EQ((*it)->u_min, 2.0F);
-
-  ++it;
-  EXPECT_EQ((*it)->id, 4U);
-  EXPECT_FLOAT_EQ((*it)->u_min, 3.0F);
-}
-
 TEST_F(BranchAndBoundTest, MakeNodeBuildsNodeWithExpectedValues)
 {
   BranchAndBoundSolver solver{
@@ -140,15 +106,8 @@ TEST_F(BranchAndBoundTest, AddUnexploredNodeAddsNodeToAllIndexes)
   solver.add_unexplored_node(node);
 
   ASSERT_EQ(solver.unexplored_nodes_by_umax_.size(), 1U);
-  ASSERT_EQ(solver.unexplored_nodes_by_umin_.size(), 1U);
-  ASSERT_EQ(solver.unexplored_node_lookup_.size(), 1U);
 
   EXPECT_EQ(*solver.unexplored_nodes_by_umax_.begin(), node);
-  EXPECT_EQ(*solver.unexplored_nodes_by_umin_.begin(), node);
-
-  const auto lookup_it = solver.unexplored_node_lookup_.find(node->id);
-  ASSERT_NE(lookup_it, solver.unexplored_node_lookup_.end());
-  EXPECT_EQ(lookup_it->second, node);
 }
 
 TEST_F(BranchAndBoundTest, EraseUnexploredNodeRemovesNodeFromAllIndexes)
@@ -167,22 +126,49 @@ TEST_F(BranchAndBoundTest, EraseUnexploredNodeRemovesNodeFromAllIndexes)
   solver.add_unexplored_node(node_to_keep);
   solver.add_unexplored_node(node_to_erase);
   ASSERT_EQ(solver.unexplored_nodes_by_umax_.size(), 2U);
-  ASSERT_EQ(solver.unexplored_nodes_by_umin_.size(), 2U);
-  ASSERT_EQ(solver.unexplored_node_lookup_.size(), 2U);
 
   solver.erase_unexplored_node(node_to_erase);
 
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.size(), 1U);
-  EXPECT_EQ(solver.unexplored_nodes_by_umin_.size(), 1U);
-  EXPECT_EQ(solver.unexplored_node_lookup_.size(), 1U);
-
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(node_to_erase), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_umin_.count(node_to_erase), 0U);
-  EXPECT_EQ(solver.unexplored_node_lookup_.count(node_to_erase->id), 0U);
-
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(node_to_keep), 1U);
-  EXPECT_EQ(solver.unexplored_nodes_by_umin_.count(node_to_keep), 1U);
-  EXPECT_EQ(solver.unexplored_node_lookup_.count(node_to_keep->id), 1U);
+}
+
+TEST_F(BranchAndBoundTest, PruneNodesWithUMaxBelowRemovesOnlyThresholdMatches)
+{
+  BranchAndBoundSolver solver{
+    num_agents, max_depth, max_iterations, discount_factor, debug_mode};
+  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
+
+  const BranchAndBoundSolver::NodePtr node_below_1 =
+    std::make_shared<BranchAndBoundSolver::Node>(
+      0.0F, 2.0F, std::vector<int>{1}, 0.0F, curr_state, 1, problem, 50U);
+  const BranchAndBoundSolver::NodePtr node_below_2 =
+    std::make_shared<BranchAndBoundSolver::Node>(
+      0.0F, 3.5F, std::vector<int>{2}, 0.0F, curr_state, 1, problem, 51U);
+  const BranchAndBoundSolver::NodePtr node_at_threshold =
+    std::make_shared<BranchAndBoundSolver::Node>(
+      0.0F, 5.0F, std::vector<int>{3}, 0.0F, curr_state, 1, problem, 52U);
+  const BranchAndBoundSolver::NodePtr node_above =
+    std::make_shared<BranchAndBoundSolver::Node>(
+      0.0F, 7.0F, std::vector<int>{4}, 0.0F, curr_state, 1, problem, 53U);
+
+  solver.add_unexplored_node(node_below_1);
+  solver.add_unexplored_node(node_below_2);
+  solver.add_unexplored_node(node_at_threshold);
+  solver.add_unexplored_node(node_above);
+
+  ASSERT_EQ(solver.unexplored_nodes_by_umax_.size(), 4U);
+
+  const std::size_t pruned = solver.prune_nodes_with_u_max_below(5.0F);
+
+  EXPECT_EQ(pruned, 3U);
+  EXPECT_EQ(solver.unexplored_nodes_by_umax_.size(), 1U);
+  EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(node_below_1), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(node_below_2), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(node_at_threshold), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(node_above), 1U);
+  EXPECT_EQ(*solver.unexplored_nodes_by_umax_.begin(), node_above);
 }
 
 TEST_F(BranchAndBoundTest, PopNodeWithHighestUMaxReturnsAndRemovesBestNode)
@@ -209,15 +195,8 @@ TEST_F(BranchAndBoundTest, PopNodeWithHighestUMaxReturnsAndRemovesBestNode)
   ASSERT_NE(popped, nullptr);
   EXPECT_EQ(popped, best_node);
   EXPECT_FLOAT_EQ(popped->u_max, 5.0F);
-
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.size(), 2U);
-  EXPECT_EQ(solver.unexplored_nodes_by_umin_.size(), 2U);
-  EXPECT_EQ(solver.unexplored_node_lookup_.size(), 2U);
-
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(best_node), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_umin_.count(best_node), 0U);
-  EXPECT_EQ(solver.unexplored_node_lookup_.count(best_node->id), 0U);
-
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(low_node), 1U);
   EXPECT_EQ(solver.unexplored_nodes_by_umax_.count(mid_node), 1U);
 }
@@ -276,6 +255,29 @@ TEST_F(BranchAndBoundTest, MaybeUpdateBestSolutionTracksHighestRewardNonEmptyPat
   solver.maybe_update_best_solution(lower_late_node);
   EXPECT_FLOAT_EQ(solver.best_reward_, 8.0F);
   EXPECT_EQ(solver.best_path_, std::vector<int>({2, 3}));
+}
+
+TEST_F(BranchAndBoundTest, SolveFindsOptimalPathInBasicScenario)
+{
+  const int test_max_depth = 3;
+  BranchAndBoundSolver solver{
+    num_agents, test_max_depth, max_iterations, discount_factor, true};
+  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
+
+  const int initial_state = 0;
+  const std::vector<int> best_path = solver.solve(initial_state, problem);
+
+  ASSERT_FALSE(best_path.empty());
+  EXPECT_EQ(best_path.size(), test_max_depth + 1);
+  EXPECT_EQ(best_path[0], initial_state);
+
+  for (int action : best_path) {
+    EXPECT_GE(action, 0);
+    EXPECT_LT(action, num_agents);
+  }
+
+  EXPECT_EQ(solver.completed_paths_count_, std::pow(num_agents, test_max_depth));
+  EXPECT_EQ(solver.total_pruned_nodes_, 0U);
 }
 
 } // namespace eyes_on_guys

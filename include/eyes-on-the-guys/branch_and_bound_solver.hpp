@@ -5,7 +5,6 @@
 #include <gtest/gtest_prod.h>
 #include <memory>
 #include <set>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -21,21 +20,21 @@ public:
   explicit BranchAndBoundSolver(int num_states, int max_depth, int max_iterations,
                                 float discount_factor = 1.0F, bool debug_mode = false);
 
-  // Executes branch-and-bound from initial_state and returns the best next action.
-  // Returns -1 when inputs/configuration are invalid or no valid action is found.
-  int solve(int initial_state, const EyesOnGuysProblem & problem_info);
+  // Executes branch-and-bound from initial_state and returns the best path found.
+  // Returns an empty vector when inputs/configuration are invalid or no valid path is found.
+  std::vector<int> solve(int initial_state, const EyesOnGuysProblem & problem_info);
 
 private:
-  // Give unit tests access to Node struc
+  // Give unit tests access to Node struct
   FRIEND_TEST(BranchAndBoundTest, OrderingsAreCorrect_Umax);
-  FRIEND_TEST(BranchAndBoundTest, OrderingsAreCorrect_Umin);
   FRIEND_TEST(BranchAndBoundTest, MakeNodeBuildsNodeWithExpectedValues);
   FRIEND_TEST(BranchAndBoundTest, AddUnexploredNodeAddsNodeToAllIndexes);
   FRIEND_TEST(BranchAndBoundTest, EraseUnexploredNodeRemovesNodeFromAllIndexes);
-  FRIEND_TEST(BranchAndBoundTest, PruneNodesWithUMinBelowRemovesOnlyThresholdMatches);
+  FRIEND_TEST(BranchAndBoundTest, PruneNodesWithUMaxBelowRemovesOnlyThresholdMatches);
   FRIEND_TEST(BranchAndBoundTest, PopNodeWithHighestUMaxReturnsAndRemovesBestNode);
   FRIEND_TEST(BranchAndBoundTest, ProblemDimensionsAreValidChecksKeyShapeMismatchCases);
   FRIEND_TEST(BranchAndBoundTest, MaybeUpdateBestSolutionTracksHighestRewardNonEmptyPath);
+  FRIEND_TEST(BranchAndBoundTest, SolveFindsOptimalPathInBasicScenario);
 
   // Unified node structure used for both algorithm values and queue bookkeeping.
   struct Node
@@ -75,12 +74,6 @@ private:
     bool operator()(const NodePtr & lhs, const NodePtr & rhs) const;
   };
 
-  // Orders unexplored nodes by ascending u_min to support threshold pruning.
-  struct UMinComparator
-  {
-    bool operator()(const NodePtr & lhs, const NodePtr & rhs) const;
-  };
-
   // Bound evaluators used when creating/expanding nodes.
   float u_min(int curr_state, const EyesOnGuysProblem & problem_state, float path_reward,
               int depth) const;
@@ -91,12 +84,12 @@ private:
   NodePtr make_node(int curr_state, int depth, const std::vector<int> & path, float reward,
                     const EyesOnGuysProblem & problem_state);
 
-  // Inserts/removes node in all unexplored-node indices.
+  // Inserts/removes node in the unexplored-node u_max index.
   void add_unexplored_node(const NodePtr & node);
   void erase_unexplored_node(const NodePtr & node);
 
-  // Prunes all unexplored nodes whose u_min is below threshold.
-  std::size_t prune_nodes_with_u_min_below(float threshold);
+  // Prunes all unexplored nodes whose u_max is below threshold.
+  std::size_t prune_nodes_with_u_max_below(float threshold);
 
   // Pops the unexplored node with largest u_max.
   NodePtr pop_node_with_highest_u_max();
@@ -117,10 +110,8 @@ private:
   float discount_factor_;
   bool debug_mode_;
 
-  // Dual indices for efficient best-first pop and threshold pruning.
+  // Unexplored nodes indexed by descending u_max for pop/prune operations.
   std::multiset<NodePtr, UMaxComparator> unexplored_nodes_by_umax_;
-  std::multiset<NodePtr, UMinComparator> unexplored_nodes_by_umin_;
-  std::unordered_map<std::size_t, NodePtr> unexplored_node_lookup_;
 
   // Runtime search counters.
   std::size_t next_node_id_;

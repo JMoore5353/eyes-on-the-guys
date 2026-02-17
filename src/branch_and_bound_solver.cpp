@@ -4,6 +4,7 @@
 #include <limits>
 
 #include "branch_and_bound_solver.hpp"
+#include "eyes_on_guys_problem.hpp"
 
 namespace eyes_on_guys
 {
@@ -32,28 +33,18 @@ bool BranchAndBoundSolver::UMaxComparator::operator()(const NodePtr & lhs,
   return lhs->id < rhs->id;
 }
 
-// Ascending u_min ordering: prune walk can remove weakest nodes first.
-bool BranchAndBoundSolver::UMinComparator::operator()(const NodePtr & lhs,
-                                                      const NodePtr & rhs) const
-{
-  if (lhs->u_min != rhs->u_min) {
-    return lhs->u_min < rhs->u_min;
-  }
-  return lhs->id < rhs->id;
-}
-
 // Lower-bound estimate from a state.
 float BranchAndBoundSolver::u_min(int curr_state, const EyesOnGuysProblem & problem_state,
                                   float path_reward, int depth) const
 {
-  return 0.0F;
+  return path_reward;
 }
 
 // Upper-bound estimate from a state.
 float BranchAndBoundSolver::u_max(int curr_state, const EyesOnGuysProblem & problem_state,
                                   float path_reward, int depth) const
 {
-  return 0.0F;
+  return 10000000.0F;
 }
 
 // Create a node with computed bounds and assign a unique id used for tie-breaking.
@@ -71,7 +62,7 @@ BranchAndBoundSolver::NodePtr BranchAndBoundSolver::make_node(
   return out;
 }
 
-// Insert node into all unexplored indexes.
+// Insert node into the unexplored u_max index.
 void BranchAndBoundSolver::add_unexplored_node(const NodePtr & node)
 {
   if (node == nullptr) {
@@ -79,11 +70,9 @@ void BranchAndBoundSolver::add_unexplored_node(const NodePtr & node)
   }
 
   unexplored_nodes_by_umax_.insert(node);
-  unexplored_nodes_by_umin_.insert(node);
-  unexplored_node_lookup_.insert({node->id, node});
 }
 
-// Remove node from all unexplored indexes.
+// Remove node from the unexplored u_max index.
 void BranchAndBoundSolver::erase_unexplored_node(const NodePtr & node)
 {
   if (node == nullptr) {
@@ -94,31 +83,20 @@ void BranchAndBoundSolver::erase_unexplored_node(const NodePtr & node)
   if (u_max_it != unexplored_nodes_by_umax_.end()) {
     unexplored_nodes_by_umax_.erase(u_max_it);
   }
-
-  auto u_min_it = unexplored_nodes_by_umin_.find(node);
-  if (u_min_it != unexplored_nodes_by_umin_.end()) {
-    unexplored_nodes_by_umin_.erase(u_min_it);
-  }
-
-  unexplored_node_lookup_.erase(node->id);
 }
 
 // Prune unexplored nodes that cannot beat the incumbent threshold.
-std::size_t BranchAndBoundSolver::prune_nodes_with_u_min_below(float threshold)
+std::size_t BranchAndBoundSolver::prune_nodes_with_u_max_below(float threshold)
 {
   std::size_t pruned_count{0U};
 
-  auto it = unexplored_nodes_by_umin_.begin();
-  while (it != unexplored_nodes_by_umin_.end() && (*it)->u_min <= threshold) {
-    const NodePtr node_to_prune = *it;
-    it = unexplored_nodes_by_umin_.erase(it);
-
-    auto u_max_it = unexplored_nodes_by_umax_.find(node_to_prune);
-    if (u_max_it != unexplored_nodes_by_umax_.end()) {
-      unexplored_nodes_by_umax_.erase(u_max_it);
+  while (!unexplored_nodes_by_umax_.empty()) {
+    auto worst_it = std::prev(unexplored_nodes_by_umax_.end());
+    if ((*worst_it)->u_max > threshold) {
+      break;
     }
 
-    unexplored_node_lookup_.erase(node_to_prune->id);
+    unexplored_nodes_by_umax_.erase(worst_it);
     ++pruned_count;
   }
 
@@ -180,9 +158,32 @@ void BranchAndBoundSolver::maybe_print_debug_info(int iteration,
 }
 
 // Main branch-and-bound loop.
-int BranchAndBoundSolver::solve(int initial_state, const EyesOnGuysProblem & problem_info)
+std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuysProblem & problem_info)
 {
-    return -1;
+  add_unexplored_node(make_node(initial_state, 0, {initial_state}, 0.0F, problem_info));
+
+  while (!unexplored_nodes_by_umax_.empty()) {
+    NodePtr max_node = pop_node_with_highest_u_max();
+
+    if (max_node->depth == max_depth_) {
+      completed_paths_count_++;
+      maybe_update_best_solution(max_node);
+
+    } else {
+      for (int next_state = 0; next_state < num_states_; ++next_state) {
+        auto new_path = max_node->path;
+        new_path.push_back(next_state);
+        const auto new_problem = max_node->problem.create_child_eyes_on_guys_state(max_node->state, next_state);
+        float new_reward = max_node->reward + compute_reward_model(max_node->state, next_state, max_node->problem, new_problem);
+
+        add_unexplored_node(make_node(next_state, max_node->depth + 1, new_path, new_reward, new_problem));
+      }
+    }
+
+    prune_nodes_with_u_max_below(best_reward_);
+  }
+
+  return best_path_;
 }
 
 } // namespace eyes_on_guys
