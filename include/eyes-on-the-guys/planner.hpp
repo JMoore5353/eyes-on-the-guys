@@ -47,6 +47,7 @@ private:
 
   // Target tracking
   std::string current_target_guy_;
+  std::vector<std::string> current_target_sequence_;
   bool has_target_;
   size_t current_guy_index_;
 
@@ -61,7 +62,7 @@ private:
   void planning_timer_callback();
 
   // Planning
-  rosplane_msgs::msg::Waypoint compute_next_waypoint();
+  rosplane_msgs::msg::Waypoint compute_waypoint_to_guy(const std::string& name);
   void select_new_target_guy();
   double compute_horizontal_distance_to_target();
   void plot_state();
@@ -91,33 +92,33 @@ private:
   * Uses MCTS to compute the next guy to fly to
   *
   * @param guy_names Vector of names of the guys (sorted in alphabetical order)
-  * @return The name of the guy to fly to
+  * @return nothing
   */
-  std::string find_next_guy_with_mcts(const std::vector<std::string>& guy_names);
+  void find_next_guy_with_mcts(const std::vector<std::string>& guy_names);
 
   /**
   * Uses Branch and Bound to compute the next guy to fly to
   *
   * @param guy_names Vector of names of the guys (sorted in alphabetical order)
-  * @return The name of the guy to fly to
+  * @return nothing
   */
-  std::string find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names);
+  void find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names);
 
   /**
   * Uses forward search to compute the next guy to fly to
   *
   * @param guy_names Vector of names of the guys (sorted in alphabetical order)
-  * @return The name of the guy to fly to
+  * @return nothing
   */
-  std::string find_next_guy_with_forward_search(const std::vector<std::string>& guy_names);
+  void find_next_guy_with_forward_search(const std::vector<std::string>& guy_names);
 
   /**
   * Sequentially iterates through the guy names
   *
   * @param guy_names Vector of names of the guys (sorted in alphabetical order)
-  * @return The name of the guy to fly to
+  * @return nothing
   */
-  std::string find_next_guy_sequentially(const std::vector<std::string>& guy_names);
+  void find_next_guy_sequentially(const std::vector<std::string>& guy_names);
 
   EyesOnGuysProblem compute_initial_problem_information(const std::vector<std::string>& guy_names) const;
 

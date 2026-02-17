@@ -11,10 +11,11 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
     # Get package directories
     rosplane_dir = get_package_share_directory('rosplane')
+    eyes_on_guys_dir = get_package_share_directory('eyes_on_the_guys')
     aircraft = "anaconda"  # Default aircraft
 
     autopilot_params = os.path.join(
-        rosplane_dir,
+        eyes_on_guys_dir,
         'params',
         aircraft + '_autopilot_params.yaml'
     )

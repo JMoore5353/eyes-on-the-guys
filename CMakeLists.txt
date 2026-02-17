@@ -119,7 +119,7 @@ target_link_libraries(monte_carlo_tree_search PUBLIC Eigen3::Eigen)
 ##   RESOURCES   ##
 ###################
 install(
-  DIRECTORY resource launch
+  DIRECTORY resource launch params
   DESTINATION share/${PROJECT_NAME}
 )
 

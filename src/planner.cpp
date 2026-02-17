@@ -56,10 +56,10 @@ Planner::Planner()
 
 void Planner::declare_parameters()
 {
-  this->declare_parameter("planning_rate_hz", 0.1);
+  this->declare_parameter("planning_rate_hz", 1.0);
   this->declare_parameter("R_min", 50.0);
   this->declare_parameter("communication_radius", 25.0);
-  this->declare_parameter("selection_algorithm", "sequential");
+  this->declare_parameter("selection_algorithm", "mcts");
   this->declare_parameter("mcts_num_iter", 100);
   this->declare_parameter("mcts_depth", 7);
   this->declare_parameter("mcts_discount_factor", 0.9);
@@ -119,27 +119,33 @@ void Planner::planning_timer_callback()
   clear_msg.clear_wp_list = true;
   waypoint_pub_->publish(clear_msg);
 
-  // Immediately send the new waypoint
-  auto waypoint = compute_next_waypoint();
-  waypoint_pub_->publish(waypoint);
+  // Immediately send the next waypoints
+  for (std::size_t i=0; i<current_target_sequence_.size(); ++i) {
+    if (i >= current_target_sequence_.size()) {
+      break;
+    }
+    std::string guy_name = current_target_sequence_.at(i);
+    auto waypoint = compute_waypoint_to_guy(guy_name);
+    waypoint_pub_->publish(waypoint);
+  }
 
   // Update the plot
   plot_state();
 }
 
-rosplane_msgs::msg::Waypoint Planner::compute_next_waypoint()
+rosplane_msgs::msg::Waypoint Planner::compute_waypoint_to_guy(const std::string& name)
 {
   rosplane_msgs::msg::Waypoint waypoint;
   waypoint.header.stamp = this->get_clock()->now();
 
-  if (!has_target_ || guy_poses_.find(current_target_guy_) == guy_poses_.end()) {
+  if (!has_target_ || guy_poses_.find(name) == guy_poses_.end()) {
     // No valid target, hold current position
     waypoint.w[0] = current_eyes_state_.p_n;
     waypoint.w[1] = current_eyes_state_.p_e;
     waypoint.w[2] = current_eyes_state_.p_d;
   } else {
     // Publish waypoint 50m above the target guy
-    const auto& target_pose = guy_poses_[current_target_guy_];
+    const auto& target_pose = guy_poses_[name];
     waypoint.w[0] = target_pose.pose.position.x;
     waypoint.w[1] = target_pose.pose.position.y;
     waypoint.w[2] = target_pose.pose.position.z - 50.0f;
@@ -164,6 +170,7 @@ void Planner::select_new_target_guy()
 
   if (current_target_guy_ == "") {
     current_target_guy_ = guy_poses_.begin()->first;
+    current_target_sequence_ = {current_target_guy_};
   }
 
   // Build vector of guy names
@@ -180,18 +187,18 @@ void Planner::select_new_target_guy()
 
   std::string selection_algorithm = this->get_parameter("selection_algorithm").as_string();
   if (selection_algorithm == "mcts") {
-    current_target_guy_ = find_next_guy_with_mcts(guy_names);
+    find_next_guy_with_mcts(guy_names);
   } else if (selection_algorithm == "branch_and_bound") {
-    current_target_guy_ = find_next_guy_with_branch_and_bound(guy_names);
+    find_next_guy_with_branch_and_bound(guy_names);
   } else if (selection_algorithm == "forward_search") {
-    current_target_guy_ = find_next_guy_with_forward_search(guy_names);
+    find_next_guy_with_forward_search(guy_names);
   } else if (selection_algorithm == "sequential") {
-    current_target_guy_ = find_next_guy_sequentially(guy_names);
+    find_next_guy_sequentially(guy_names);
   } else {
     RCLCPP_WARN(this->get_logger(),
                 "Unable to parse selection_algorithm type %s! Defaulting to 'sequential'!",
                 selection_algorithm.c_str());
-    current_target_guy_ = find_next_guy_sequentially(guy_names);
+    find_next_guy_sequentially(guy_names);
   }
 
   has_target_ = true;
@@ -391,7 +398,7 @@ double Planner::compute_dubins_path_length(float start_n, float start_e, float s
   return static_cast<double>(L);
 }
 
-std::string Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
+void Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
 {
   int num_agents = static_cast<int>(guy_names.size());
 
@@ -407,24 +414,37 @@ std::string Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy
                                                             problem_info_,
                                                             this->get_parameter("mcts_lookahead_depth").as_int(),
                                                             this->get_parameter("mcts_lookahead_iters").as_int());
+  std::vector<int> optimal_sequence = tree_searcher.get_greedy_sequence();
 
-  return guy_names.at(optimal_action);
+  current_target_guy_ = guy_names.at(optimal_action);
+  current_target_sequence_.clear();
+  for (int idx : optimal_sequence) {
+    current_target_sequence_.push_back(guy_names.at(idx));
+  }
 }
 
-std::string Planner::find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names)
+void Planner::find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names)
 {
-  return find_next_guy_sequentially(guy_names);
+  find_next_guy_sequentially(guy_names);
 }
 
-std::string Planner::find_next_guy_with_forward_search(const std::vector<std::string>& guy_names)
+void Planner::find_next_guy_with_forward_search(const std::vector<std::string>& guy_names)
 {
-  return find_next_guy_sequentially(guy_names);
+  find_next_guy_sequentially(guy_names);
 }
 
-std::string Planner::find_next_guy_sequentially(const std::vector<std::string>& guy_names)
+void Planner::find_next_guy_sequentially(const std::vector<std::string>& guy_names)
 {
   current_guy_index_ = current_guy_index_ % guy_names.size();
-  return guy_names[current_guy_index_++];
+  current_target_guy_ = guy_names[current_guy_index_];
+
+  current_target_sequence_.clear();
+  for (int i=0; i<5; ++i) {
+    int guy_idx = (current_guy_index_ + i) % guy_names.size();
+    current_target_sequence_.push_back(guy_names.at(guy_idx));
+  }
+
+  current_guy_index_++;
 }
 
 EyesOnGuysProblem Planner::compute_initial_problem_information(const std::vector<std::string>& guy_names) const
