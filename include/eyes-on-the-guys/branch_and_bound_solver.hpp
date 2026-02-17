@@ -107,7 +107,7 @@ private:
   void maybe_update_best_solution(const NodePtr & node);
 
   // Optional per-iteration debug printout.
-  void maybe_print_debug_info(int iteration, std::size_t pruned_this_iteration) const;
+  void maybe_print_debug_info() const;
 
   // Resets all mutable search state so the solver can be reused across calls.
   void reset();

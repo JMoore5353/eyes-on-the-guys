@@ -150,15 +150,14 @@ void BranchAndBoundSolver::maybe_update_best_solution(const NodePtr & node)
 }
 
 // Optional per-iteration diagnostics to understand search progress.
-void BranchAndBoundSolver::maybe_print_debug_info(int iteration,
-                                                  std::size_t pruned_this_iteration) const
+void BranchAndBoundSolver::maybe_print_debug_info() const
 {
   if (!debug_mode_) {
     return;
   }
 
-  std::cout << "[BranchAndBoundSolver] iter=" << iteration
-            << " pruned_nodes=" << pruned_this_iteration
+  std::cout << "[BranchAndBoundSolver] explored_nodes=" << explored_nodes_count_
+            << " pruned_nodes=" << total_pruned_nodes_
             << " completed_paths=" << completed_paths_count_ << std::endl;
 }
 
@@ -210,8 +209,8 @@ std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuys
       }
     }
 
-    std::size_t pruned_this_iter = prune_nodes();
-    maybe_print_debug_info(iteration, pruned_this_iter);
+    total_pruned_nodes_ += prune_nodes();
+    maybe_print_debug_info();
     ++iteration;
   }
 
