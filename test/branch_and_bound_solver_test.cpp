@@ -261,29 +261,6 @@ TEST_F(BranchAndBoundTest, MaybeUpdateBestSolutionTracksHighestRewardNonEmptyPat
   EXPECT_EQ(solver.best_path_, std::vector<int>({2, 3}));
 }
 
-TEST_F(BranchAndBoundTest, SolveFindsOptimalPathInBasicScenario)
-{
-  const int test_max_depth = 3;
-  BranchAndBoundSolver solver{
-    num_agents, test_max_depth, max_iterations, discount_factor, true};
-  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
-
-  const int initial_state = 0;
-  const std::vector<int> best_path = solver.solve(initial_state, problem);
-
-  ASSERT_FALSE(best_path.empty());
-  EXPECT_EQ(best_path.size(), test_max_depth + 1);
-  EXPECT_EQ(best_path[0], initial_state);
-
-  for (int action : best_path) {
-    EXPECT_GE(action, 0);
-    EXPECT_LT(action, num_agents);
-  }
-
-  EXPECT_EQ(solver.completed_paths_count_, std::pow(num_agents, test_max_depth));
-  EXPECT_EQ(solver.total_pruned_nodes_, 0U);
-}
-
 TEST_F(BranchAndBoundTest, SolveResetsBetweenCalls)
 {
   const int test_max_depth = 2;
@@ -377,7 +354,7 @@ TEST_F(BranchAndBoundTest, SolveAppliesDiscountFactor)
 
 TEST_F(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem)
 {
-  const int test_max_depth = 2;
+  const int test_max_depth = 3;
   BranchAndBoundSolver solver{
     num_agents, test_max_depth, max_iterations, 1.0, false};
   EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
@@ -396,9 +373,14 @@ TEST_F(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem)
       auto p2 = p1.create_child_eyes_on_guys_state(a1, a2);
       double r2 = r1 + compute_reward_model(a1, a2, p1, p2);
 
-      if (r2 > brute_best_reward) {
-        brute_best_reward = r2;
-        brute_best_path = {initial_state, a1, a2};
+      for (int a3 = 0; a3 < num_agents; ++a3) {
+        auto p3 = p2.create_child_eyes_on_guys_state(a2, a3);
+        double r3 = r2 + compute_reward_model(a2, a3, p2, p3);
+
+        if (r3 > brute_best_reward) {
+          brute_best_reward = r3;
+          brute_best_path = {initial_state, a1, a2, a3};
+        }
       }
     }
   }
