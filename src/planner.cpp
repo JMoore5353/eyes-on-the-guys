@@ -23,6 +23,8 @@ Planner::Planner()
     , current_target_guy_{""}
     , has_target_(false)
     , current_guy_index_(0)
+    , problem_info_{0, 1.0, Eigen::Matrix<double, 0, 0>::Zero()}
+    , time_of_last_visit_to_any_agent_{this->get_clock()->now()}
 {
   declare_parameters();
 
@@ -34,6 +36,10 @@ Planner::Planner()
   // Subscribe to guy poses
   guy_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseStamped>(
     "guy_poses", 10, std::bind(&Planner::guy_pose_callback, this, std::placeholders::_1));
+
+  // Subscribe to the bits of info
+  guy_bits_sub_ = this->create_subscription<eyes_on_the_guys::msg::Bit>(
+    "guy_bits", 10, std::bind(&Planner::guy_bits_callback, this, std::placeholders::_1));
 
   // Publisher for waypoints to rosplane path manager
   waypoint_pub_ = this->create_publisher<rosplane_msgs::msg::Waypoint>("waypoint_path", 10);
@@ -50,7 +56,7 @@ Planner::Planner()
 
 void Planner::declare_parameters()
 {
-  this->declare_parameter("planning_rate_hz", 1.0);
+  this->declare_parameter("planning_rate_hz", 0.1);
   this->declare_parameter("R_min", 50.0);
   this->declare_parameter("communication_radius", 25.0);
   this->declare_parameter("selection_algorithm", "sequential");
@@ -71,6 +77,11 @@ void Planner::eyes_state_callback(const rosplane_msgs::msg::State & msg)
 void Planner::guy_pose_callback(const geometry_msgs::msg::PoseStamped & msg)
 {
   guy_poses_[msg.header.frame_id] = msg;
+}
+
+void Planner::guy_bits_callback(const eyes_on_the_guys::msg::Bit & msg)
+{
+  guy_bits_[msg.header.frame_id] = msg.bits;
 }
 
 void Planner::planning_timer_callback()
@@ -164,6 +175,8 @@ void Planner::select_new_target_guy()
     guy_names.push_back(name);
     names += name + " ";
   }
+
+  update_problem_info(guy_names);
 
   std::string selection_algorithm = this->get_parameter("selection_algorithm").as_string();
   if (selection_algorithm == "mcts") {
@@ -381,7 +394,6 @@ double Planner::compute_dubins_path_length(float start_n, float start_e, float s
 std::string Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
 {
   int num_agents = static_cast<int>(guy_names.size());
-  EyesOnGuysProblem initial_problem_info = compute_initial_problem_information(guy_names);
 
   std::vector<std::string>::const_iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
   int initial_state = std::distance(guy_names.begin(), it);
@@ -392,7 +404,7 @@ std::string Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy
                                                             this->get_parameter("mcts_depth").as_int(),
                                                             this->get_parameter("mcts_discount_factor").as_double(),
                                                             this->get_parameter("mcts_exploration_bonus").as_double(),
-                                                            initial_problem_info,
+                                                            problem_info_,
                                                             this->get_parameter("mcts_lookahead_depth").as_int(),
                                                             this->get_parameter("mcts_lookahead_iters").as_int());
 
@@ -417,13 +429,31 @@ std::string Planner::find_next_guy_sequentially(const std::vector<std::string>& 
 
 EyesOnGuysProblem Planner::compute_initial_problem_information(const std::vector<std::string>& guy_names) const
 {
-  int num_agents = guy_poses_.size();
+  int num_agents = static_cast<int>(guy_names.size());
   double curr_speed = std::max(std::sqrt(current_eyes_state_.v_x * current_eyes_state_.v_x +
                                          current_eyes_state_.v_y * current_eyes_state_.v_y +
                                          current_eyes_state_.v_z * current_eyes_state_.v_z), 15.0f);
   Eigen::MatrixXd distance_between_agents = compute_distance_between_guys(guy_names, guy_poses_);
 
   return EyesOnGuysProblem{num_agents, curr_speed, distance_between_agents};
+}
+
+  void Planner::update_problem_info(const std::vector<std::string>& guy_names)
+{
+  if (problem_info_.num_agents() != static_cast<int>(guy_names.size())) {
+    problem_info_ = compute_initial_problem_information(guy_names);
+  }
+
+  std::vector<std::string>::const_iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
+  int current_state = std::distance(guy_names.begin(), it);
+
+  problem_info_.update_relay_information(current_state, guy_bits_[current_target_guy_]);
+
+  rclcpp::Time now = this->get_clock()->now();
+  double dt_sec = (now - time_of_last_visit_to_any_agent_).seconds();
+  time_of_last_visit_to_any_agent_ = now;
+
+  problem_info_.update_time_since_last_visit(current_state, dt_sec);
 }
 
 Eigen::MatrixXd compute_distance_between_guys(const std::vector<std::string>& guy_names,

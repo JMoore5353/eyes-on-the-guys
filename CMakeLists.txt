@@ -85,7 +85,7 @@ if(Matplot++_FOUND)
 else()
   target_link_libraries(planner matplot)
 endif()
-target_link_libraries(planner monte_carlo_tree_search)
+target_link_libraries(planner monte_carlo_tree_search "${cpp_typesupport_target}")
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
@@ -149,6 +149,7 @@ if(BUILD_TESTING)
     GTest::GTest
     GTest::Main
     monte_carlo_tree_search
+    "${cpp_typesupport_target}"
   )
   if(Matplot++_FOUND)
     target_link_libraries(unit_tests Matplot++::matplot)
