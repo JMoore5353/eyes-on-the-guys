@@ -177,38 +177,48 @@ void BranchAndBoundSolver::reset()
 // Main branch-and-bound loop.
 std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuysProblem & problem_info)
 {
+  // Clear any previous search state
   reset();
 
+  // Validate that the problem is properly configured
   if (!problem_dimensions_are_valid(problem_info)) {
     return {};
   }
 
+  // Initialize the search with the initial state
   add_unexplored_node(make_node(initial_state, 0, {initial_state}, 0.0, problem_info));
 
   int iteration = 0;
   while (!unexplored_nodes_by_q_max_.empty() && iteration < max_iterations_) {
+    // Explore the current best option
     NodePtr max_node = pop_node_with_highest_q_max();
     ++explored_nodes_count_;
 
+    // Check if this is a complete path
     if (max_node->depth == max_depth_) {
       ++completed_paths_count_;
       maybe_update_best_solution(max_node);
 
     } else {
+      // Generate child nodes
       for (int next_state = 0; next_state < num_states_; ++next_state) {
         auto new_path = max_node->path;
         new_path.push_back(next_state);
         auto new_problem = max_node->problem.create_child_eyes_on_guys_state(max_node->state, next_state);
+
+        // Compute the reward accumulated thus far with the path
         double step_reward =
           compute_reward_model(max_node->state, next_state, max_node->problem, new_problem);
         double new_reward = max_node->reward + std::pow(discount_factor_, max_node->depth) * step_reward;
 
+        // Add the new node to the unexplored set
         add_unexplored_node(
           make_node(next_state, max_node->depth + 1, std::move(new_path), new_reward,
                     std::move(new_problem)));
       }
     }
 
+    // Prune nodes that cannot improve the best solution or u_min threshold
     total_pruned_nodes_ += prune_nodes();
     maybe_print_debug_info();
     ++iteration;
