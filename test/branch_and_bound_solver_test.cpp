@@ -1,4 +1,5 @@
 #include <Eigen/Core>
+#include <chrono>
 #include <cmath>
 #include <gtest/gtest.h>
 #include <limits>
@@ -387,6 +388,102 @@ TEST_F(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem)
 
   EXPECT_EQ(solver_path, brute_best_path);
   EXPECT_DOUBLE_EQ(solver.best_reward_, brute_best_reward);
+}
+
+TEST_F(BranchAndBoundTest, PerformanceTestLargeProblem)
+{
+  // Test parameters - adjust these to explore different problem sizes
+  const int num_agents = 6;
+  const int test_depth = 5;  // Adjust between 1-10 to test different depths
+  const int max_iterations = 100000000;  // Large enough to not limit the search
+  
+  // Create a realistic distance matrix for 6 agents
+  // Distances are in some arbitrary units (e.g., meters)
+  Eigen::MatrixXd distance_between_agents(num_agents, num_agents);
+  distance_between_agents << 
+    0,  50, 80, 120, 150, 200,
+    50, 0,  60,  90, 130, 170,
+    80, 60,  0,  70, 110, 140,
+    120, 90, 70,  0,  80, 100,
+    150, 130, 110, 80,  0,  90,
+    200, 170, 140, 100, 90,  0;
+  
+  // Create a realistic shared information matrix
+  // Represents information gain between agents
+  Eigen::MatrixXd shared_info_matrix(num_agents, num_agents);
+  shared_info_matrix <<
+    0,  10,  5,  0,  0,  0,
+    0,  0,  15,  5,  0,  0,
+    0,  0,  0,  20, 10,  0,
+    0,  0,  0,  0,  25, 15,
+    0,  0,  0,  0,  0,  30,
+    0,  0,  0,  0,  0,  0;
+  
+  // Relay speed (units per time step)
+  const double relay_speed = 10.0;
+  
+  // Create the problem
+  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
+  problem.shared_info_matrix = shared_info_matrix;
+  
+  // Initialize time since last contact to create urgency
+  problem.time_since_last_relay_contact_with_agent = 
+    Eigen::VectorXd::LinSpaced(num_agents, 10.0, 100.0);
+  
+  // Create solver with debug mode to see progress
+  BranchAndBoundSolver solver{
+    num_agents, test_depth, max_iterations, 0.95, false};  // Enable debug output
+  
+  std::cout << "\n=== Performance Test Parameters ===" << std::endl;
+  std::cout << "Number of agents: " << num_agents << std::endl;
+  std::cout << "Search depth: " << test_depth << std::endl;
+  std::cout << "Maximum iterations: " << max_iterations << std::endl;
+  std::cout << "Total possible paths: " << std::pow(num_agents, test_depth) << std::endl;
+  std::cout << "Discount factor: 0.95" << std::endl;
+  std::cout << "Relay speed: " << relay_speed << std::endl;
+  std::cout << "\nStarting solve..." << std::endl;
+  
+  // Time the solve operation
+  auto start_time = std::chrono::high_resolution_clock::now();
+  
+  const int initial_state = 0;
+  const std::vector<int> best_path = solver.solve(initial_state, problem);
+  
+  auto end_time = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+    end_time - start_time);
+  
+  // Print performance metrics
+  std::cout << "\n=== Performance Results ===" << std::endl;
+  std::cout << "Solve time: " << duration.count() << " ms" << std::endl;
+  std::cout << "Best path found: ";
+  for (size_t i = 0; i < best_path.size(); ++i) {
+    std::cout << best_path[i];
+    if (i < best_path.size() - 1) std::cout << " -> ";
+  }
+  std::cout << std::endl;
+  std::cout << "Best reward: " << solver.best_reward_ << std::endl;
+  std::cout << "Nodes explored: " << solver.explored_nodes_count_ << std::endl;
+  std::cout << "Nodes pr (pruned): " << solver.total_pruned_nodes_ << std::endl;
+  std::cout << "Completed paths: " << solver.completed_paths_count_ << std::endl;
+  std::cout << "Final u_min threshold: " << solver.u_min_threshold_ << std::endl;
+  
+  // Calculate efficiency metrics
+  // Geometric series: total nodes = (b^(d+1) - 1) / (b - 1) for branching factor b, depth d
+  const double total_possible_nodes =
+    (std::pow(num_agents, test_depth + 1) - 1) / (num_agents - 1);
+  const double exploration_percentage = (solver.explored_nodes_count_ / total_possible_nodes) * 100.0;
+  const double pruning_percentage = (solver.total_pruned_nodes_ / total_possible_nodes) * 100.0;
+  
+  std::cout << "\n=== Efficiency Metrics ===" << std::endl;
+  std::cout << "Total nodes in full tree: " << total_possible_nodes << std::endl;
+  std::cout << "Tree explored: " << exploration_percentage << "%" << std::endl;
+  std::cout << "Tree pr: " << pruning_percentage << "%" << std::endl;
+  std::cout << "Nodes per millisecond: " << 
+    (solver.explored_nodes_count_ / std::max(1.0, static_cast<double>(duration.count()))) << std::endl;
+  
+  // Note: This test doesn't assert anything - it's purely for observation
+  // You can adjust the parameters above to test different scenarios
 }
 
 } // namespace eyes_on_guys

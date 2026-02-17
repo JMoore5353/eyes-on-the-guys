@@ -41,6 +41,7 @@ private:
   FRIEND_TEST(BranchAndBoundTest, SolveWithDepthOne);
   FRIEND_TEST(BranchAndBoundTest, SolveAppliesDiscountFactor);
   FRIEND_TEST(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem);
+  FRIEND_TEST(BranchAndBoundTest, PerformanceTestLargeProblem);
 
   // Unified node structure used for both algorithm values and queue bookkeeping.
   struct Node
