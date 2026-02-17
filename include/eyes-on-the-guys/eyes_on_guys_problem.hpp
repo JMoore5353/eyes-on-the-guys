@@ -26,7 +26,8 @@ double compute_time_to_take_action(const int curr_state, const int action, const
                                    const Eigen::MatrixXd & distance_between_agents);
 double compute_reward_model(const int curr_state, const int next_state,
                             const EyesOnGuysProblem & curr_state_info,
-                            const EyesOnGuysProblem & next_state_info);
+                            const EyesOnGuysProblem & next_state_info,
+                            const bool include_penalties = true);
 
 } // namespace eyes_on_guys
 

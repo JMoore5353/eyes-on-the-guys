@@ -10,6 +10,10 @@
 
 #include "eyes_on_guys_problem.hpp"
 
+// Multiplier for encouraging deep search rather than wide search
+// 
+const double TUNNELING_WEIGHT_PARAM = 0.5;
+
 namespace eyes_on_guys
 {
 
@@ -18,14 +22,15 @@ class BranchAndBoundSolver
 {
 public:
   explicit BranchAndBoundSolver(int num_states, int max_depth, int max_iterations,
-                                double discount_factor = 1.0, bool debug_mode = false);
+                                double discount_factor = 1.0, bool debug_mode = false,
+                                bool enable_pruning = true);
 
   // Executes branch-and-bound from initial_state and returns the best path found.
   // Returns an empty vector when inputs/configuration are invalid or no valid path is found.
   std::vector<int> solve(int initial_state, const EyesOnGuysProblem & problem_info);
 
 private:
-  // Give unit tests access to Node struct
+  // Give unit tests access to private members
   FRIEND_TEST(BranchAndBoundTest, OrderingsAreCorrect_Qmax);
   FRIEND_TEST(BranchAndBoundTest, MakeNodeBuildsNodeWithExpectedValues);
   FRIEND_TEST(BranchAndBoundTest, AddUnexploredNodeAddsNodeToAllIndexes);
@@ -42,32 +47,46 @@ private:
   FRIEND_TEST(BranchAndBoundTest, SolveAppliesDiscountFactor);
   FRIEND_TEST(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem);
   FRIEND_TEST(BranchAndBoundTest, PerformanceTestLargeProblem);
+  FRIEND_TEST(BranchAndBoundTest, AntiGreedyPathReturnsEmptyWhenAtMaxDepth);
+  FRIEND_TEST(BranchAndBoundTest, AntiGreedyPathPicksFarthestNeighbor);
+  FRIEND_TEST(BranchAndBoundTest, AntiGreedyPathAvoidsVisitedNodes);
+  FRIEND_TEST(BranchAndBoundTest, AntiGreedyPathResetsWhenAllNodesVisited);
+  FRIEND_TEST(BranchAndBoundTest, AntiGreedyPathLengthMatchesRemainingDepth);
+  FRIEND_TEST(BranchAndBoundTest, AntiGreedyPathWithSingleAgent);
+  FRIEND_TEST(BranchAndBoundTest, QMaxIsAtLeastPathReward);
+  FRIEND_TEST(BranchAndBoundTest, QMaxWithoutPenaltiesIsGreaterOrEqualToFullReward);
+  FRIEND_TEST(BranchAndBoundTest, QMaxAtMaxDepthEqualsPathReward);
+  FRIEND_TEST(BranchAndBoundTest, QMaxIsConsistentWithAntiGreedyPath);
+  FRIEND_TEST(BranchAndBoundTest, UMinEqualsPathReward);
+  FRIEND_TEST(BranchAndBoundTest, WeightingParameterAffectsNodeOrdering);
+  FRIEND_TEST(BranchAndBoundTest, WeightingParameterZeroWeightPreservesQMaxOrdering);
+  FRIEND_TEST(BranchAndBoundTest, WeightingParameterDeepNodesPreferredWithPositiveWeight);
+  FRIEND_TEST(BranchAndBoundTest, WeightingParameterAffectsSolverPathSelection);
+  friend class PruningComparisonTest;
 
   // Unified node structure used for both algorithm values and queue bookkeeping.
   struct Node
   {
-    // u_min: pessimistic lower bound on total achievable reward from this node.
     // q_max: optimistic upper bound on total achievable reward from this node.
-    // path: sequence of actions taken from root to reach this node.
+    // weighted_q_max: q_max weighted by depth to encourage deeper search.
+    // path: sequence of actions taken from root to reach this node (last element is current state).
     // reward: accumulated discounted reward along path.
-    // state/depth/problem/id: search bookkeeping for expansion and indexing.
-    Node(double u_min, double q_max, std::vector<int> path, double reward, int state, int depth,
-         EyesOnGuysProblem problem, std::size_t id)
-        : u_min(u_min)
-        , q_max(q_max)
+    // depth/problem/id: search bookkeeping for expansion and indexing.
+    Node(double q_max, double weighted_q_max, std::vector<int> path, double reward,
+         int depth, EyesOnGuysProblem problem, std::size_t id)
+        : q_max(q_max)
+        , weighted_q_max(weighted_q_max)
         , path(std::move(path))
         , reward(reward)
-        , state(state)
         , depth(depth)
         , problem(std::move(problem))
         , id(id)
     {}
 
-    double u_min;
     double q_max;
+    double weighted_q_max;
     std::vector<int> path;
     double reward;
-    int state;
     int depth;
     EyesOnGuysProblem problem;
     std::size_t id;
@@ -81,21 +100,25 @@ private:
     bool operator()(const NodePtr & lhs, const NodePtr & rhs) const;
   };
 
-  // Bound evaluators used when creating/expanding nodes.
-  double u_min(int curr_state, const EyesOnGuysProblem & problem_state, double path_reward,
-              int depth) const;
-  double q_max(int curr_state, const EyesOnGuysProblem & problem_state, double path_reward,
-              int depth) const;
+  // Bound evaluator used when creating/expanding nodes.
+  double q_max(int state, std::vector<int> path,
+               const EyesOnGuysProblem & problem_state, double path_reward, int depth) const;
+  
+  // Helper functions for computing bounds
+  // Determines the longest path from the current node till search depth
+  std::vector<int> anti_greedy_path(int curr_state, std::vector<int> current_path,
+                                     const EyesOnGuysProblem & problem_state, int depth) const;
 
   // Creates a fully initialized node with computed bounds and unique id.
-  NodePtr make_node(int curr_state, int depth, std::vector<int> path, double reward,
+  // Current state is inferred from path.back().
+  NodePtr make_node(int depth, std::vector<int> path, double reward,
                     EyesOnGuysProblem problem_state);
 
   // Inserts/removes node in the unexplored-node q_max index.
   void add_unexplored_node(const NodePtr & node);
   void erase_unexplored_node(const NodePtr & node);
 
-  // Prunes all unexplored nodes whose q_max is below u_min_threshold.
+  // Prunes all unexplored nodes whose weighted_q_max is below the best reward found so far.
   std::size_t prune_nodes();
 
   // Pops the unexplored node with largest q_max.
@@ -119,6 +142,7 @@ private:
   int max_iterations_;
   double discount_factor_;
   bool debug_mode_;
+  bool enable_pruning_;
 
   // Unexplored nodes indexed by descending q_max for pop/prune operations.
   std::multiset<NodePtr, QMaxComparator> unexplored_nodes_by_q_max_;
@@ -132,7 +156,6 @@ private:
   // Incumbent best solution summary.
   double best_reward_;
   std::vector<int> best_path_;
-  double u_min_threshold_;
 };
 
 } // namespace eyes_on_guys

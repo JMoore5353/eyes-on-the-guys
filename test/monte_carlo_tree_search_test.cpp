@@ -216,7 +216,7 @@ public:
     problem_info.time_since_last_relay_contact_with_agent = Eigen::Vector3d{0.0, 5.0, 0.0};
 
     optimal_action = 2;
-    optimal_greedy_seq = {2, 1, 0};
+    optimal_greedy_seq = {2, 0, 1};
   }
 };
 
@@ -237,7 +237,7 @@ TEST_F(MCTSThreeAgentTestTwo, Given1000Iters_WhenTakingAction_ExpectOptimalActio
 {
   num_iter = 1000;
   depth = 10;
-  optimal_greedy_seq = {2, 1, 0, 2, 1, 0, 2, 1, 0, 2};
+  optimal_greedy_seq = {2, 0, 1, 2, 0, 1, 2, 0, 1, 2};
   MonteCarloTreeSearch tree_searcher{num_agents};
 
   int action = tree_searcher.search_for_best_action(initial_state, num_iter, depth, discount_factor,

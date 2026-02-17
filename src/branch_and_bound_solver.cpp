@@ -10,54 +10,112 @@ namespace eyes_on_guys
 {
 
 BranchAndBoundSolver::BranchAndBoundSolver(int num_states, int max_depth, int max_iterations,
-                                           double discount_factor, bool debug_mode)
+                                           double discount_factor, bool debug_mode,
+                                           bool enable_pruning)
     : num_states_{num_states}
     , max_depth_{max_depth}
     , max_iterations_{max_iterations}
     , discount_factor_{std::max(discount_factor, 0.0)}
     , debug_mode_{debug_mode}
+    , enable_pruning_{enable_pruning}
     , next_node_id_{0U}
     , explored_nodes_count_{0U}
     , completed_paths_count_{0U}
     , total_pruned_nodes_{0U}
     , best_reward_{std::numeric_limits<double>::lowest()}
-    , u_min_threshold_{std::numeric_limits<double>::lowest()}
 {}
 
 // Descending q_max ordering: begin() is the most promising unexplored node.
 bool BranchAndBoundSolver::QMaxComparator::operator()(const NodePtr & lhs,
                                                       const NodePtr & rhs) const
 {
-  if (lhs->q_max != rhs->q_max) {
-    return lhs->q_max > rhs->q_max;
+  if (lhs->weighted_q_max != rhs->weighted_q_max) {
+    return lhs->weighted_q_max > rhs->weighted_q_max;
   }
   return lhs->id < rhs->id;
 }
 
-// Lower-bound estimate from a state.
-double BranchAndBoundSolver::u_min(int curr_state, const EyesOnGuysProblem & problem_state,
+// Upper-bound estimate from a state.
+// Currently finds upper bound by finding the longest path from the current state without revising
+// nodes (unless required) and finds reward of path without time/dist penalty.
+double BranchAndBoundSolver::q_max(int state, std::vector<int> path,
+                                   const EyesOnGuysProblem & problem_state,
                                    double path_reward, int depth) const
 {
-  return path_reward;
+  int curr_state = state;
+
+  // Get anti-greedy path
+  auto ag_path = anti_greedy_path(curr_state, path, problem_state, depth);
+
+  // Calculate reward of anti-greedy path, without time/dist penalty
+  double reward = 0.0;
+  EyesOnGuysProblem current_problem_state = problem_state;
+  int curr_depth = depth;
+  for (int next_state : ag_path) {
+    EyesOnGuysProblem next_problem_state =
+      current_problem_state.create_child_eyes_on_guys_state(curr_state, next_state);
+    reward += std::pow(discount_factor_, curr_depth) *
+      compute_reward_model(curr_state, next_state, current_problem_state, next_problem_state, false);
+
+    curr_state = next_state;
+    current_problem_state = next_problem_state;
+    curr_depth++;
+  }
+
+  // Add to current path reward
+  return path_reward + reward;
 }
 
-// Upper-bound estimate from a state.
-double BranchAndBoundSolver::q_max(int curr_state, const EyesOnGuysProblem & problem_state,
-                                   double path_reward, int depth) const
+// Determines the longest path from the current node till search depth
+// Avoid repeating nodes until necessary
+std::vector<int> BranchAndBoundSolver::anti_greedy_path(
+  int curr_state,
+  std::vector<int> current_path,
+  const EyesOnGuysProblem & problem_state,
+  int depth) const
 {
-  return std::numeric_limits<double>::infinity();
+  // Get current distance matrix and path
+  auto dist_matrix = problem_state.distance_between_agents;
+  int curr_depth = depth;
+  std::vector<int> result_path;
+
+  // Set rows of current path to zero
+  for (int state : current_path) {
+    dist_matrix.row(state).setZero();
+  }
+
+  while (curr_depth < max_depth_) {
+    // If matrix is all zeros, reset back to original
+    if (dist_matrix.sum() == 0.0) {
+      dist_matrix = problem_state.distance_between_agents;
+    }
+    
+    // Find the index of the largest value in the row of the current state
+    int max_idx;
+    dist_matrix.row(curr_state).maxCoeff(&max_idx);
+
+    // Move to this state and add it to the path
+    result_path.push_back(max_idx);
+    curr_state = max_idx;
+    curr_depth++;
+
+    // Set row of current state to zero
+    dist_matrix.row(curr_state).setZero();
+  }
+  
+  return result_path;
 }
 
 // Create a node with computed bounds and assign a unique id used for tie-breaking.
 BranchAndBoundSolver::NodePtr BranchAndBoundSolver::make_node(
-  int curr_state, int depth, std::vector<int> path, double reward,
+  int depth, std::vector<int> path, double reward,
   EyesOnGuysProblem problem_state)
 {
-  double lower = u_min(curr_state, problem_state, reward, depth);
-  double upper = q_max(curr_state, problem_state, reward, depth);
+  int curr_state = path.back();
+  double upper = q_max(curr_state, path, problem_state, reward, depth);
 
   NodePtr out = std::make_shared<Node>(
-    lower, upper, std::move(path), reward, curr_state, depth,
+    upper, (TUNNELING_WEIGHT_PARAM * depth + 1.0) * upper, std::move(path), reward, depth,
     std::move(problem_state), next_node_id_);
 
   ++next_node_id_;
@@ -73,7 +131,6 @@ void BranchAndBoundSolver::add_unexplored_node(const NodePtr & node)
   }
 
   unexplored_nodes_by_q_max_.insert(node);
-  u_min_threshold_ = std::max(u_min_threshold_, node->u_min);
 }
 
 // Remove node from the unexplored q_max index.
@@ -96,7 +153,7 @@ std::size_t BranchAndBoundSolver::prune_nodes()
 
   while (!unexplored_nodes_by_q_max_.empty()) {
     auto worst_it = std::prev(unexplored_nodes_by_q_max_.end());
-    if ((*worst_it)->q_max > u_min_threshold_) {
+    if ((*worst_it)->q_max > best_reward_) {
       break;
     }
 
@@ -145,7 +202,6 @@ void BranchAndBoundSolver::maybe_update_best_solution(const NodePtr & node)
   if (node->reward > best_reward_) {
     best_reward_ = node->reward;
     best_path_ = node->path;
-    u_min_threshold_ = std::max(u_min_threshold_, node->reward);
   }
 }
 
@@ -171,7 +227,6 @@ void BranchAndBoundSolver::reset()
   total_pruned_nodes_ = 0U;
   best_reward_ = std::numeric_limits<double>::lowest();
   best_path_.clear();
-  u_min_threshold_ = std::numeric_limits<double>::lowest();
 }
 
 // Main branch-and-bound loop.
@@ -186,7 +241,7 @@ std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuys
   }
 
   // Initialize the search with the initial state
-  add_unexplored_node(make_node(initial_state, 0, {initial_state}, 0.0, problem_info));
+  add_unexplored_node(make_node(0, {initial_state}, 0.0, problem_info));
 
   int iteration = 0;
   while (!unexplored_nodes_by_q_max_.empty() && iteration < max_iterations_) {
@@ -204,22 +259,25 @@ std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuys
       for (int next_state = 0; next_state < num_states_; ++next_state) {
         auto new_path = max_node->path;
         new_path.push_back(next_state);
-        auto new_problem = max_node->problem.create_child_eyes_on_guys_state(max_node->state, next_state);
+        int curr_state = max_node->path.back();
+        auto new_problem = max_node->problem.create_child_eyes_on_guys_state(curr_state, next_state);
 
         // Compute the reward accumulated thus far with the path
         double step_reward =
-          compute_reward_model(max_node->state, next_state, max_node->problem, new_problem);
+          compute_reward_model(curr_state, next_state, max_node->problem, new_problem);
         double new_reward = max_node->reward + std::pow(discount_factor_, max_node->depth) * step_reward;
 
         // Add the new node to the unexplored set
         add_unexplored_node(
-          make_node(next_state, max_node->depth + 1, std::move(new_path), new_reward,
+          make_node(max_node->depth + 1, std::move(new_path), new_reward,
                     std::move(new_problem)));
       }
     }
 
-    // Prune nodes that cannot improve the best solution or u_min threshold
-    total_pruned_nodes_ += prune_nodes();
+    // Prune nodes that cannot improve the best solution
+    if (enable_pruning_) {
+      total_pruned_nodes_ += prune_nodes();
+    }
     maybe_print_debug_info();
     ++iteration;
   }
