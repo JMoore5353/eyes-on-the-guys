@@ -326,6 +326,10 @@ TEST_F(BranchAndBoundTest, SolveWithDepthOne)
   double best_single_step_reward = std::numeric_limits<double>::lowest();
   int best_action = -1;
   for (int a = 0; a < num_agents; ++a) {
+    if (a == initial_state) {
+      continue;
+    }
+
     auto child = problem.create_child_eyes_on_guys_state(initial_state, a);
     double r = compute_reward_model(initial_state, a, problem, child);
     if (r > best_single_step_reward) {
@@ -335,6 +339,45 @@ TEST_F(BranchAndBoundTest, SolveWithDepthOne)
   }
   EXPECT_EQ(best_path[1], best_action);
   EXPECT_DOUBLE_EQ(solver.best_reward_, best_single_step_reward);
+}
+
+TEST_F(BranchAndBoundTest, SolveSkipsCurrentStateEvenWhenSelfTransitionHasHighestImmediateReward)
+{
+  const int test_max_depth = 1;
+  BranchAndBoundSolver solver{
+    num_agents, test_max_depth, max_iterations, 1.0, false};
+  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
+
+  const int initial_state = 0;
+
+  const auto self_child =
+    problem.create_child_eyes_on_guys_state(initial_state, initial_state);
+  const double self_transition_reward =
+    compute_reward_model(initial_state, initial_state, problem, self_child);
+
+  double best_non_self_reward = std::numeric_limits<double>::lowest();
+  int best_non_self_action = -1;
+  for (int action = 0; action < num_agents; ++action) {
+    if (action == initial_state) {
+      continue;
+    }
+
+    const auto child = problem.create_child_eyes_on_guys_state(initial_state, action);
+    const double reward = compute_reward_model(initial_state, action, problem, child);
+    if (reward > best_non_self_reward) {
+      best_non_self_reward = reward;
+      best_non_self_action = action;
+    }
+  }
+
+  ASSERT_GT(self_transition_reward, best_non_self_reward);
+
+  const std::vector<int> best_path = solver.solve(initial_state, problem);
+
+  ASSERT_EQ(best_path.size(), 2U);
+  EXPECT_EQ(best_path[0], initial_state);
+  EXPECT_NE(best_path[1], initial_state);
+  EXPECT_EQ(best_path[1], best_non_self_action);
 }
 
 TEST_F(BranchAndBoundTest, SolveAppliesDiscountFactor)
@@ -358,7 +401,7 @@ TEST_F(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem)
 {
   const int test_max_depth = 3;
   BranchAndBoundSolver solver{
-    num_agents, test_max_depth, max_iterations, 1.0, false};
+    num_agents, test_max_depth, max_iterations, 1.0, false, false};
   EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
 
   const int initial_state = 0;
@@ -368,14 +411,26 @@ TEST_F(BranchAndBoundTest, SolveMatchesBruteForceForSmallProblem)
   std::vector<int> brute_best_path;
 
   for (int a1 = 0; a1 < num_agents; ++a1) {
+    if (a1 == initial_state) {
+      continue;
+    }
+
     auto p1 = problem.create_child_eyes_on_guys_state(initial_state, a1);
     double r1 = compute_reward_model(initial_state, a1, problem, p1);
 
     for (int a2 = 0; a2 < num_agents; ++a2) {
+      if (a2 == a1) {
+        continue;
+      }
+
       auto p2 = p1.create_child_eyes_on_guys_state(a1, a2);
       double r2 = r1 + compute_reward_model(a1, a2, p1, p2);
 
       for (int a3 = 0; a3 < num_agents; ++a3) {
+        if (a3 == a2) {
+          continue;
+        }
+
         auto p3 = p2.create_child_eyes_on_guys_state(a2, a3);
         double r3 = r2 + compute_reward_model(a2, a3, p2, p3);
 

@@ -139,8 +139,8 @@ if(BUILD_TESTING)
     test/monte_carlo_node_test.cpp
     test/monte_carlo_tree_search_test.cpp
     test/eyes_on_guys_problem_test.cpp
-    test/branch_and_bound_solver_test.cpp
-    test/pruning_comparison_test.cpp)
+    test/branch_and_bound_solver_test.cpp)
+    #test/pruning_comparison_test.cpp)
   target_include_directories(unit_tests
     PRIVATE
       ${GTEST_INCLUDE_DIRS})

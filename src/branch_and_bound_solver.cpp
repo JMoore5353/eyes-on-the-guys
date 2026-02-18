@@ -257,6 +257,11 @@ std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuys
     } else {
       // Generate child nodes
       for (int next_state = 0; next_state < num_states_; ++next_state) {
+        // Avoid revisiting current state
+        if (next_state == max_node->path.back()) {
+          continue;
+        }
+
         auto new_path = max_node->path;
         new_path.push_back(next_state);
         int curr_state = max_node->path.back();
