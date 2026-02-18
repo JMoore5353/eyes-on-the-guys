@@ -1,6 +1,9 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <functional>
+#include <sstream>
+#include <stdexcept>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -9,6 +12,7 @@
 #include <rosplane_msgs/msg/waypoint.hpp>
 
 #include "planner.hpp"
+#include "forward_search_solver.hpp"
 #include "monte_carlo_tree_search.hpp"
 #include "eyes_on_guys_problem.hpp"
 
@@ -16,6 +20,62 @@ using namespace std::chrono_literals;
 
 namespace eyes_on_guys
 {
+
+namespace
+{
+
+int find_starting_guy_index(const std::vector<std::string> & guy_names, const std::string & current_target_guy)
+{
+  const std::vector<std::string>::const_iterator it =
+    std::find(guy_names.begin(), guy_names.end(), current_target_guy);
+  if (it == guy_names.end()) {
+    return 0;
+  }
+  return static_cast<int>(std::distance(guy_names.begin(), it));
+}
+
+ForwardSearchSolver::ForwardSearchInput make_forward_search_input(
+  const std::vector<std::string> & guy_names,
+  const std::map<std::string, geometry_msgs::msg::PoseStamped> & guy_poses,
+  const EyesOnGuysProblem & problem_info)
+{
+  ForwardSearchSolver::ForwardSearchInput input;
+  input.ids = guy_names;
+  for (size_t i = 0; i < guy_names.size(); ++i) {
+    const std::string & id = guy_names.at(i);
+    ForwardSearchSolver::GuyState state;
+    const auto pose_it = guy_poses.find(id);
+    if (pose_it != guy_poses.end()) {
+      state.pose = pose_it->second;
+    }
+    if (problem_info.relays_current_info.size() == static_cast<int>(guy_names.size())) {
+      state.bits = static_cast<float>(problem_info.relays_current_info(static_cast<int>(i)));
+    }
+    input.guy_states_by_id.emplace(id, state);
+  }
+  return input;
+}
+
+ForwardSearchSolver::ForwardSearchConfig make_forward_search_config(
+  const Planner & planner,
+  int starting_guy,
+  const Eigen::MatrixXd & shared_info_matrix)
+{
+  ForwardSearchSolver::ForwardSearchConfig config;
+  config.depth = planner.get_parameter("forward_search_depth").as_int();
+  config.num_rollouts = planner.get_parameter("forward_search_num_rollouts").as_int();
+  config.roll_out_depth = planner.get_parameter("forward_search_roll_out_depth").as_int();
+  config.discount_factor = planner.get_parameter("forward_search_discount_factor").as_double();
+  config.agent_velocity = planner.get_parameter("forward_search_agent_velocity").as_double();
+  config.info_shared_weight = planner.get_parameter("forward_search_info_shared_weight").as_double();
+  config.path_length_weight = planner.get_parameter("forward_search_path_length_weight").as_double();
+  config.time_since_visit_weight = planner.get_parameter("forward_search_time_since_visit_weight").as_double();
+  config.starting_guy = starting_guy;
+  config.shared_info_matrix = shared_info_matrix;
+  return config;
+}
+
+} // namespace
 
 Planner::Planner()
     : Node("planner")
@@ -59,13 +119,21 @@ void Planner::declare_parameters()
   this->declare_parameter("planning_rate_hz", 1.0);
   this->declare_parameter("R_min", 50.0);
   this->declare_parameter("communication_radius", 25.0);
-  this->declare_parameter("selection_algorithm", "mcts");
+  this->declare_parameter("selection_algorithm", "forward_search");
   this->declare_parameter("mcts_num_iter", 100);
   this->declare_parameter("mcts_depth", 7);
   this->declare_parameter("mcts_discount_factor", 0.9);
   this->declare_parameter("mcts_exploration_bonus", 100.0);
   this->declare_parameter("mcts_lookahead_depth", 5);
   this->declare_parameter("mcts_lookahead_iters", 30);
+  this->declare_parameter("forward_search_depth", 6);
+  this->declare_parameter("forward_search_num_rollouts", 20);
+  this->declare_parameter("forward_search_roll_out_depth", 5);
+  this->declare_parameter("forward_search_discount_factor", 0.5);
+  this->declare_parameter("forward_search_agent_velocity", 15.0);
+  this->declare_parameter("forward_search_info_shared_weight", 10.0);
+  this->declare_parameter("forward_search_path_length_weight", 1.0);
+  this->declare_parameter("forward_search_time_since_visit_weight", 10.0);
 }
 
 void Planner::eyes_state_callback(const rosplane_msgs::msg::State & msg)
@@ -430,7 +498,52 @@ void Planner::find_next_guy_with_branch_and_bound(const std::vector<std::string>
 
 void Planner::find_next_guy_with_forward_search(const std::vector<std::string>& guy_names)
 {
-  find_next_guy_sequentially(guy_names);
+  const int starting_guy = find_starting_guy_index(guy_names, current_target_guy_);
+  const ForwardSearchSolver::ForwardSearchInput input = make_forward_search_input(
+    guy_names,
+    guy_poses_,
+    problem_info_);
+  const ForwardSearchSolver::ForwardSearchConfig config = make_forward_search_config(
+    *this,
+    starting_guy,
+    problem_info_.shared_info_matrix);
+
+  RCLCPP_INFO_STREAM(
+    this->get_logger(),
+    "Forward search input guy_names.size(): " << guy_names.size());
+  RCLCPP_INFO_STREAM(
+    this->get_logger(),
+    "Forward search config depth passed to solver: " << config.depth);
+
+  ForwardSearchSolver solver;
+  const auto solve_start = std::chrono::steady_clock::now();
+  const ForwardSearchSolver::ForwardSearchResult result = solver.solve(input, config);
+  const auto solve_end = std::chrono::steady_clock::now();
+  const double solve_elapsed_sec =
+    std::chrono::duration<double>(solve_end - solve_start).count();
+  RCLCPP_INFO_STREAM(
+    this->get_logger(),
+    "Forward search solve() elapsed seconds: " << solve_elapsed_sec);
+  if (!result.success || result.sequence_ids.empty()) {
+    throw std::runtime_error("Forward search failed to produce a sequence: " + result.message);
+  }
+
+  std::ostringstream sequence_stream;
+  for (size_t i = 0; i < result.sequence_ids.size(); ++i) {
+    if (i > 0) {
+      sequence_stream << " -> ";
+    }
+    sequence_stream << result.sequence_ids.at(i);
+  }
+  RCLCPP_INFO_STREAM(
+    this->get_logger(),
+    "Forward search optimal sequence (len=" << result.sequence_ids.size() << "): "
+      << sequence_stream.str());
+
+  current_target_guy_ = result.sequence_ids.at(0);
+  current_target_sequence_ = result.sequence_ids;
+
+  RCLCPP_INFO_STREAM(this->get_logger(), "FORWARD NEXT: " << current_target_guy_);
 }
 
 void Planner::find_next_guy_sequentially(const std::vector<std::string>& guy_names)
