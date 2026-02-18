@@ -48,10 +48,10 @@ private:
 
   EyesOnGuysProblem problem_info_;
 };
-int find_best_action(const int & id, const int & num_agents, const double & exploration_bonus,
+int find_best_action(const int id, const int num_agents, const double exploration_bonus,
                      const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a);
 int find_max_q_value(const int node_id, const Eigen::VectorXd & Q_s_a);
-double get_ucb1_bound(const int & action, const double & exploration_bonus,
+double get_ucb1_bound(const int action, const double exploration_bonus,
                       const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a);
 double compute_running_average(const double new_val, const double old_val, const int new_count);
 

@@ -49,7 +49,7 @@ Guys::Guys()
 
 void Guys::declare_parameters()
 {
-  this->declare_parameter("publish_rate_hz", 1.0);
+  this->declare_parameter("publish_rate_hz", 2.0);
   this->declare_parameter("number_of_guys", 6);
   this->declare_parameter("std_dev", 0.1);
   this->declare_parameter("velocity", 1.0);

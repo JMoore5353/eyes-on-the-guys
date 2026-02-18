@@ -2,7 +2,6 @@
 #include <cmath>
 #include <limits>
 #include <memory>
-#include <vector>
 
 #include "eyes_on_guys_problem.hpp"
 #include "monte_carlo_node.hpp"
@@ -15,14 +14,11 @@ MCTSNode::MCTSNode(const int id, const int num_agents, const double exploration_
     , num_agents_{num_agents}
     , exploration_bonus_{exploration_bonus}
     , node_has_been_visited_{false}
+    , N_s_a_{Eigen::VectorXi::Zero(num_agents)}
+    , Q_s_a_{Eigen::VectorXd::Zero(num_agents)}
+    , children_{static_cast<std::size_t>(num_agents), nullptr}
     , problem_info_{num_agents, 1.0, Eigen::MatrixXd::Zero(num_agents, num_agents)}
-{
-  N_s_a_ = Eigen::VectorXi::Zero(num_agents);
-  Q_s_a_ = Eigen::VectorXd::Zero(num_agents);
-  for (int i{0}; i < num_agents; ++i) {
-    children_.push_back(nullptr);
-  }
-}
+{}
 
 MCTSNode::MCTSNode(const int id, const int num_agents, const double exploration_bonus,
                    const EyesOnGuysProblem & problem_info)
@@ -30,14 +26,11 @@ MCTSNode::MCTSNode(const int id, const int num_agents, const double exploration_
     , num_agents_{num_agents}
     , exploration_bonus_{exploration_bonus}
     , node_has_been_visited_{false}
+    , N_s_a_{Eigen::VectorXi::Zero(num_agents)}
+    , Q_s_a_{Eigen::VectorXd::Zero(num_agents)}
+    , children_{static_cast<std::size_t>(num_agents), nullptr}
     , problem_info_{problem_info}
-{
-  N_s_a_ = Eigen::VectorXi::Zero(num_agents);
-  Q_s_a_ = Eigen::VectorXd::Zero(num_agents);
-  for (int i{0}; i < num_agents; ++i) {
-    children_.push_back(nullptr);
-  }
-}
+{}
 
 int MCTSNode::explore_best_action() const
 {
@@ -74,10 +67,10 @@ void MCTSNode::update_count_and_action_value_function(const int action, const do
   Q_s_a_[action] = compute_running_average(q, Q_s_a_[action], N_s_a_[action]);
 }
 
-int find_best_action(const int & id, const int & num_agents, const double & exploration_bonus,
+int find_best_action(const int id, const int num_agents, const double exploration_bonus,
                      const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a)
 {
-  int best_action{0};
+  int best_action = 0 ? (id != 0) : std::min(1, num_agents - 1);
   double best_action_ucb1_value = std::numeric_limits<double>::lowest();
   for (int i = 0; i < num_agents; ++i) {
     if (i == id) {
@@ -96,7 +89,7 @@ int find_best_action(const int & id, const int & num_agents, const double & expl
 int find_max_q_value(const int node_id, const Eigen::VectorXd & Q_s_a)
 {
   double max_val{std::numeric_limits<double>::lowest()};
-  int max_index{0};
+  int max_index = 0 ? (node_id != 0) : std::min(1, (int)Q_s_a.size());
 
   for (int i = 0; i < Q_s_a.size(); ++i) {
     if (i == node_id) {
@@ -112,7 +105,7 @@ int find_max_q_value(const int node_id, const Eigen::VectorXd & Q_s_a)
   return max_index;
 }
 
-double get_ucb1_bound(const int & action, const double & exploration_bonus,
+double get_ucb1_bound(const int action, const double exploration_bonus,
                       const Eigen::VectorXi & N_s_a, const Eigen::VectorXd & Q_s_a)
 {
   if (action >= N_s_a.size() || action >= Q_s_a.size()) {
