@@ -50,12 +50,31 @@ It then recursively updates preceeding states with rewards and yields the sequen
 This solution yields the optimal solution for a given depth but can often be intractable depending on the number of searchers and depth.
 The number of agents effects the branching factor causing the run time to explode. 
 Depth similarly effects depth, these effects are analyzed in the analysis fuction.
-This mehtod was used as a ground truth against which the other methods were compared.
+This method was used as a ground truth against which the other methods were compared.
 
 
 <!-- Diagram forward search -->
 
 ### Branch-and-Bound
+Branch and bound attempts to find the optimal solution while avoiding the necessity of searching over the entire state space.
+This is done by calculating an upper bound on the total possible future reward for any given state, and pruning any search directions that have a bound lower than the current best solution, or the best reward lower bound on any partial solution.
+This method relies on having a good upper bound, as there is no generalized way to determine an appropriate upper bound.
+Rollouts where not used for this method, as very deep searches were found to be adequately fast, negating the need for rollouts.
+
+#### Upper Bound
+Our chosen upper bound for this problem was chosen to prioritize speed, enabling very deep searches to be done in a few milliseconds but at the cost of optimality, as the bound sometimes will prune the optimal solution.
+
+The bound is calculated with the following algorithm, given the current partially determined path and problem state:
+1. Visiting states in a greedy manner so as to maximize the total distance of the path. Avoid revisiting states that have already been visited, unless all states have been visited in which case the 'visited' states are reset to unvisited and the algorithm continues until search depth.
+2. Calculate the total reward of the path WITHOUT time or distance penalties.
+3. Add this reward to the current reward of the partial solution.
+4. Return this value as the upper bound.
+
+The motivation behind this bound comes from the structure of our reward function.
+In the absense of time or distance penalties, the information gain of the system would give larger rewards for longer paths, as longer paths allow more time for information to be accumulated.
+It would still encourage avoiding frequent visits to the same searcher however, as searchers with longer times since their last visit would yield larger rewards.
+Hence, a 'longest sequential path' is a resonable approximation of the non-penalized solution.
+We then rely on the fact that the actual reward function is penalized, unlike our bound, to ensure we do not prune too many good solutions.
 
 ### Monte Carlo Tree Search
 
