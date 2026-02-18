@@ -74,6 +74,7 @@ double compute_reward_model(const int curr_state, const int next_state,
 {
   double gamma{1.0};
   double beta{0.1};
+  double zeta{1.0};
 
   // Mathematically equivalent to ||curr_state.relay_info - curr_state.shared_info_matrix.row(action)||_2
   // with action information set to 0. Not setting action to 0 adds an additional incentive to
@@ -93,18 +94,19 @@ double compute_reward_model(const int curr_state, const int next_state,
     // trips among the group (I think)
     double distance_penalty = beta * curr_state_info.distance_between_agents(curr_state, next_state);
 
-    return shared_info_reward - distance_penalty;
+    // Mathematically equivalent to (time to take action)*(number of possible actions - 1) - action last visit time.
+    // Discourages long trips as well, as action time is weighted substantially heavier than time since last visit.
+    // This is mostly redundant with the distance penalty.
+
+    Eigen::VectorXd delta_time_since_last_contact =
+      next_state_info.time_since_last_relay_contact_with_agent
+      - curr_state_info.time_since_last_relay_contact_with_agent;
+    double time_since_last_visit_penalty = delta_time_since_last_contact.sum() * zeta;
+
+    return shared_info_reward - distance_penalty - time_since_last_visit_penalty;
   } else {
     return shared_info_reward;
   }
 
-  // Mathematically equivalent to (time to take action)*(number of possible actions - 1) - action last visit time.
-  // Discourages long trips as well, as action time is weighted substantially heavier than time since last visit.
-  // This is mostly redundant with the distance penalty.
-
-  //Eigen::VectorXd delta_time_since_last_contact =
-  //  next_state_info.time_since_last_relay_contact_with_agent
-  //  - curr_state_info.time_since_last_relay_contact_with_agent;
-  //double time_since_last_visit_penalty = delta_time_since_last_contact.sum() * zeta;
 }
 } // namespace eyes_on_guys
