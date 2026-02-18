@@ -125,7 +125,8 @@ void Planner::declare_parameters()
   this->declare_parameter("communication_radius", 25.0);
   this->declare_parameter("selection_algorithm", "forward_search");
   this->declare_parameter("mcts_num_iter", 100);
-  this->declare_parameter("mcts_depth", 7);
+  this->declare_parameter("mcts_depth", 20);
+  this->declare_parameter("mcts_plan_depth", 7);
   this->declare_parameter("mcts_discount_factor", 0.9);
   this->declare_parameter("mcts_exploration_bonus", 100.0);
   this->declare_parameter("mcts_lookahead_depth", 5);
@@ -318,7 +319,7 @@ void Planner::plot_state()
 
   auto plot_guys_and_uav = [&](matplot::figure_handle fig) {
     fig->quiet_mode(true);
-    // cla();
+    cla();
 
     std::vector<std::array<float, 3>> colors = {
       {0.12f, 0.47f, 0.71f},  // blue
@@ -446,7 +447,9 @@ void Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
 
   current_target_guy_ = guy_names.at(optimal_action);
   current_target_sequence_.clear();
-  for (int idx : optimal_sequence) {
+  int64_t depth = std::min(this->get_parameter("mcts_plan_depth").as_int(), (int64_t)optimal_sequence.size());
+  for (int64_t i=0; i<depth; ++i) {
+    int idx = optimal_sequence.at(i);
     current_target_sequence_.push_back(guy_names.at(idx));
   }
 }
