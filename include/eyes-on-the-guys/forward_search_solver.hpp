@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <string>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <limits>
 
@@ -63,53 +64,55 @@ public:
 private:
   struct Action
   {
-    std::string who_to_go_to;
+    int next_index = -1;
     double value;
   };
   
   struct ActionSequence 
   {
     std::vector<Action> sequence;
-
-    double total_value;
+    double total_value = -std::numeric_limits<double>::infinity();
   };
 
   struct State 
   {
-    std::string current_guy;
+    int current_index = -1;
     Eigen::MatrixXd shared_info_matrix;
     Eigen::VectorXd relay_info;
     Eigen::VectorXd relay_time_since_visit;
     Eigen::VectorXd guy_bits;
     Eigen::VectorXd guy_bits_rate;
-    double value;
+    double value = 0.0;
   };
 
-  ActionSequence forward_search(int depth, State state);
-  double reward_function(const State & state, const Action & action) const;
+  ActionSequence forward_search(int depth, State & state);
+  double reward_function(
+    const State & state,
+    int current_index,
+    int next_index,
+    double path_length) const;
   double roll_out(const State & state);
   double compute_dubins_path_length(float start_n, float start_e, float start_chi,
                                            float end_n, float end_e, float end_chi);
-  double calculate_path_length(const GuyState & current_guy_state, const GuyState & next_guy_state) const;
-  int index_for_id(const std::string & id) const;
-  std::string format_sequence_with_start(const std::string & start_id, const ActionSequence & sequence) const;
-  std::vector<std::string> action_candidates(const std::string & current_guy) const;
+  static double calculate_path_length(const GuyState & current_guy_state, const GuyState & next_guy_state);
   State make_initial_state(
-    const std::string & starting_id,
     int starting_index,
     int size,
     const Eigen::MatrixXd & initial_shared_info_matrix) const;
   bool apply_action_transition(
-    const State & state,
-    const std::string & next_id,
+    State & state,
+    int next_index,
     double gamma,
     double vel,
-    State & next_state,
     double & reward,
+    double & transition_time,
     bool emit_debug_logs) const;
 
   std::map<std::string, GuyState> guy_states_by_id_;
   std::vector<std::string> ids_;
+  std::unordered_map<std::string, int> id_to_index_;
+  std::vector<std::vector<int>> candidates_by_index_;
+  Eigen::MatrixXd cached_path_lengths_;
   State current_state_;
   ForwardSearchConfig current_config_;
 };

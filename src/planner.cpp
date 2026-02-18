@@ -126,7 +126,7 @@ void Planner::declare_parameters()
   this->declare_parameter("mcts_exploration_bonus", 100.0);
   this->declare_parameter("mcts_lookahead_depth", 5);
   this->declare_parameter("mcts_lookahead_iters", 30);
-  this->declare_parameter("forward_search_depth", 4);
+  this->declare_parameter("forward_search_depth", 6);
   this->declare_parameter("forward_search_num_rollouts", 20);
   this->declare_parameter("forward_search_roll_out_depth", 5);
   this->declare_parameter("forward_search_discount_factor", 0.5);

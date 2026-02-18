@@ -1,10 +1,9 @@
 #include "forward_search_solver.hpp"
 
 #include <algorithm>
-#include <iterator>
 #include <limits>
 #include <random>
-#include <sstream>
+#include <utility>
 
 namespace eyes_on_guys
 {
@@ -27,7 +26,6 @@ ForwardSearchSolver::ForwardSearchResult ForwardSearchSolver::solve(
       ids_.push_back(id);
     }
   }
-  std::sort(ids_.begin(), ids_.end());
 
   ForwardSearchResult result;
   const int size = static_cast<int>(ids_.size());
@@ -42,6 +40,35 @@ ForwardSearchSolver::ForwardSearchResult ForwardSearchSolver::solve(
     return result;
   }
 
+  id_to_index_.clear();
+  id_to_index_.reserve(static_cast<size_t>(size));
+  for (int i = 0; i < size; ++i) {
+    id_to_index_[ids_.at(static_cast<size_t>(i))] = i;
+  }
+
+  candidates_by_index_.assign(static_cast<size_t>(size), {});
+  for (int i = 0; i < size; ++i) {
+    std::vector<int> candidates;
+    candidates.reserve(static_cast<size_t>(size - 1));
+    for (int j = 0; j < size; ++j) {
+      if (j != i) {
+        candidates.push_back(j);
+      }
+    }
+    candidates_by_index_.at(static_cast<size_t>(i)) = std::move(candidates);
+  }
+
+  cached_path_lengths_ = Eigen::MatrixXd::Zero(size, size);
+  for (int i = 0; i < size; ++i) {
+    const GuyState & from = guy_states_by_id_.at(ids_.at(static_cast<size_t>(i)));
+    for (int j = i + 1; j < size; ++j) {
+      const GuyState & to = guy_states_by_id_.at(ids_.at(static_cast<size_t>(j)));
+      const double distance = calculate_path_length(from, to);
+      cached_path_lengths_(i, j) = distance;
+      cached_path_lengths_(j, i) = distance;
+    }
+  }
+
   Eigen::MatrixXd initial_shared_info_matrix = input.shared_info_matrix;
   if (current_config_.shared_info_matrix.rows() == size &&
       current_config_.shared_info_matrix.cols() == size)
@@ -49,28 +76,23 @@ ForwardSearchSolver::ForwardSearchResult ForwardSearchSolver::solve(
     initial_shared_info_matrix = current_config_.shared_info_matrix;
   }
 
-  const std::string & starting_id = ids_.at(static_cast<size_t>(current_config_.starting_guy));
   current_state_ = make_initial_state(
-    starting_id,
     current_config_.starting_guy,
     size,
     initial_shared_info_matrix);
-  const ActionSequence best_sequence = forward_search(current_config_.depth, current_state_);
+  ActionSequence best_sequence = forward_search(current_config_.depth, current_state_);
 
   result.success = true;
   result.message = "Search completed.";
   result.total_value = best_sequence.total_value;
   result.sequence_ids.reserve(best_sequence.sequence.size());
   for (const auto & action : best_sequence.sequence) {
-    result.sequence_ids.push_back(action.who_to_go_to);
-  }
-  while (!result.sequence_ids.empty() && result.sequence_ids.front() == starting_id) {
-    result.sequence_ids.erase(result.sequence_ids.begin());
+    result.sequence_ids.push_back(ids_.at(static_cast<size_t>(action.next_index)));
   }
   return result;
 }
 
-ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int depth, State state)
+ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int depth, State & state)
 {
   if (depth <= 0) {
     ActionSequence action_sequence;
@@ -82,50 +104,68 @@ ForwardSearchSolver::ActionSequence ForwardSearchSolver::forward_search(int dept
   const double vel = current_config_.agent_velocity;
 
   ActionSequence best_action_sequence;
-  best_action_sequence.total_value = -std::numeric_limits<double>::infinity();
+  const int current_index = state.current_index;
+  const std::vector<int> & candidates = candidates_by_index_.at(static_cast<size_t>(current_index));
+  Eigen::RowVectorXd previous_shared_row(state.shared_info_matrix.cols());
 
-  for (const std::string & id : action_candidates(state.current_guy)) {
-    Action new_action;
-    new_action.who_to_go_to = id;
+  for (const int next_index : candidates) {
+    const int previous_current_index = state.current_index;
+    const double previous_value = state.value;
+    const double previous_next_time = state.relay_time_since_visit(next_index);
+    const double previous_relay_info_next = state.relay_info(next_index);
+    previous_shared_row = state.shared_info_matrix.row(previous_current_index);
 
     double reward = 0.0;
-    State new_state;
-    if (!apply_action_transition(state, id, gamma, vel, new_state, reward, false)) {
+    double transition_time = 0.0;
+    if (!apply_action_transition(state, next_index, gamma, vel, reward, transition_time, false)) {
       continue;
     }
 
-    new_action.value = new_state.value;
+    ActionSequence child_sequence = forward_search(depth - 1, state);
+    ActionSequence candidate_sequence;
+    candidate_sequence.total_value = reward + gamma * child_sequence.total_value;
+    candidate_sequence.sequence.reserve(child_sequence.sequence.size() + 1);
+    candidate_sequence.sequence.push_back(Action{next_index, state.value});
+    candidate_sequence.sequence.insert(
+      candidate_sequence.sequence.end(),
+      child_sequence.sequence.begin(),
+      child_sequence.sequence.end());
 
-    ActionSequence action_sequence = forward_search(depth - 1, new_state);
-    action_sequence.sequence.insert(action_sequence.sequence.begin(), new_action);
-    action_sequence.total_value = reward + gamma * action_sequence.total_value;
-
-    if (action_sequence.total_value > best_action_sequence.total_value) {
-      best_action_sequence = action_sequence;
+    if (candidate_sequence.total_value > best_action_sequence.total_value) {
+      best_action_sequence = std::move(candidate_sequence);
     }
+
+    state.current_index = previous_current_index;
+    state.value = previous_value;
+    state.relay_time_since_visit.array() -= transition_time;
+    state.relay_time_since_visit(next_index) = previous_next_time;
+    state.guy_bits.array() -= state.guy_bits_rate.array() * transition_time;
+    state.relay_info(next_index) = previous_relay_info_next;
+    state.shared_info_matrix.row(previous_current_index) = previous_shared_row;
   }
 
   return best_action_sequence;
 }
 
-double ForwardSearchSolver::reward_function(const State & state, const Action & action) const
+double ForwardSearchSolver::reward_function(
+  const State & state,
+  int current_index,
+  int next_index,
+  double path_length) const
 {
+  (void)current_index;
+  (void)next_index;
   const double beta = current_config_.info_shared_weight;
   const double lambda = current_config_.path_length_weight;
   const double xi = current_config_.time_since_visit_weight;
 
-  const GuyState & current_guy_state = guy_states_by_id_.at(state.current_guy);
-  const GuyState & next_guy_state = guy_states_by_id_.at(action.who_to_go_to);
-
   const double summed_time_since_last_visit = xi * state.relay_time_since_visit.sum();
-  const double path_length = calculate_path_length(current_guy_state, next_guy_state);
-
   return beta * state.shared_info_matrix.norm() - lambda * path_length - summed_time_since_last_visit;
 }
 
 double ForwardSearchSolver::calculate_path_length(
   const GuyState & current_guy_state,
-  const GuyState & next_guy_state) const
+  const GuyState & next_guy_state)
 {
   Eigen::Vector3d curr_position;
   curr_position << current_guy_state.pose.pose.position.x,
@@ -162,23 +202,24 @@ double ForwardSearchSolver::roll_out(const State & state)
     double discount = 1.0;
 
     for (int step = 0; step < roll_out_depth; ++step) {
-      const std::vector<std::string> candidates = action_candidates(rollout_state.current_guy);
+      const std::vector<int> & candidates =
+        candidates_by_index_.at(static_cast<size_t>(rollout_state.current_index));
       if (candidates.empty()) {
         break;
       }
 
       std::uniform_int_distribution<size_t> dist(0, candidates.size() - 1);
-      const std::string & next_id = candidates[dist(rng)];
+      const int next_index = candidates[dist(rng)];
 
       double reward = 0.0;
-      State next_state;
-      if (!apply_action_transition(rollout_state, next_id, gamma, vel, next_state, reward, false)) {
+      double transition_time = 0.0;
+      if (!apply_action_transition(
+          rollout_state, next_index, gamma, vel, reward, transition_time, false))
+      {
         break;
       }
       rollout_value += discount * reward;
       discount *= gamma;
-
-      rollout_state = next_state;
     }
 
     summed_rollout_values += rollout_value;
@@ -187,54 +228,21 @@ double ForwardSearchSolver::roll_out(const State & state)
   return summed_rollout_values / static_cast<double>(num_rollouts);
 }
 
-int ForwardSearchSolver::index_for_id(const std::string & id) const
-{
-  auto it = std::find(ids_.begin(), ids_.end(), id);
-  if (it == ids_.end()) {
-    return -1;
-  }
-  return static_cast<int>(std::distance(ids_.begin(), it));
-}
-
-std::string ForwardSearchSolver::format_sequence_with_start(
-  const std::string & start_id,
-  const ActionSequence & sequence) const
-{
-  std::ostringstream seq_stream;
-  seq_stream << start_id;
-  for (const auto & action : sequence.sequence) {
-    seq_stream << " -> " << action.who_to_go_to;
-  }
-  return seq_stream.str();
-}
-
-std::vector<std::string> ForwardSearchSolver::action_candidates(const std::string & current_guy) const
-{
-  std::vector<std::string> candidates;
-  candidates.reserve(ids_.size());
-  for (const std::string & id : ids_) {
-    if (id != current_guy) {
-      candidates.push_back(id);
-    }
-  }
-  return candidates;
-}
-
 ForwardSearchSolver::State ForwardSearchSolver::make_initial_state(
-  const std::string & starting_id,
   int starting_index,
   int size,
   const Eigen::MatrixXd & initial_shared_info_matrix) const
 {
   State state;
-  state.current_guy = starting_id;
+  state.current_index = starting_index;
   if (initial_shared_info_matrix.rows() == size && initial_shared_info_matrix.cols() == size) {
     state.shared_info_matrix = initial_shared_info_matrix;
   } else {
     state.shared_info_matrix = Eigen::MatrixXd::Zero(size, size);
   }
   state.relay_info = Eigen::VectorXd::Zero(size);
-  state.relay_info(starting_index) = guy_states_by_id_.at(starting_id).bits;
+  state.relay_info(starting_index) =
+    guy_states_by_id_.at(ids_.at(static_cast<size_t>(starting_index))).bits;
 
   state.relay_time_since_visit = Eigen::VectorXd::Constant(size, 1'000.0);
   state.relay_time_since_visit(starting_index) = 0.0;
@@ -247,47 +255,42 @@ ForwardSearchSolver::State ForwardSearchSolver::make_initial_state(
     state.guy_bits(i) = guy_state.bits;
     state.guy_bits_rate(i) = guy_state.bits_rate;
   }
-
-  state.value = 0.0;
   return state;
 }
 
 bool ForwardSearchSolver::apply_action_transition(
-  const State & state,
-  const std::string & next_id,
+  State & state,
+  int next_index,
   double gamma,
   double vel,
-  State & next_state,
   double & reward,
+  double & transition_time,
   bool emit_debug_logs) const
 {
   (void)emit_debug_logs;
 
-  const int current_index = index_for_id(state.current_guy);
-  const int next_index = index_for_id(next_id);
-  if (current_index < 0 || next_index < 0) {
+  const int current_index = state.current_index;
+  if (current_index < 0 || next_index < 0 ||
+      current_index >= cached_path_lengths_.rows() ||
+      next_index >= cached_path_lengths_.cols() ||
+      current_index == next_index)
+  {
     return false;
   }
 
-  next_state = state;
-  next_state.current_guy = next_id;
+  const double path_length = cached_path_lengths_(current_index, next_index);
+  transition_time = path_length / vel;
+  reward = reward_function(state, current_index, next_index, path_length);
 
-  const GuyState & current_guy_state = guy_states_by_id_.at(state.current_guy);
-  const GuyState & next_guy_state = guy_states_by_id_.at(next_id);
-  const double path_length = calculate_path_length(current_guy_state, next_guy_state);
-  const double time_to_take_action = path_length / vel;
+  state.relay_time_since_visit.array() += transition_time;
+  state.relay_time_since_visit(next_index) = 0.0;
+  state.guy_bits.array() += state.guy_bits_rate.array() * transition_time;
 
-  next_state.relay_time_since_visit.array() += time_to_take_action;
-  next_state.relay_time_since_visit(next_index) = 0.0;
-  next_state.guy_bits.array() += next_state.guy_bits_rate.array() * time_to_take_action;
-
-  next_state.relay_info(next_index) = next_state.guy_bits(next_index);
-  next_state.shared_info_matrix.row(current_index) = next_state.relay_info.transpose();
-  next_state.shared_info_matrix(current_index, current_index) = 0.0;
-
-  const Action action{next_id, 0.0};
-  reward = reward_function(state, action);
-  next_state.value = reward + gamma * state.value;
+  state.relay_info(next_index) = state.guy_bits(next_index);
+  state.shared_info_matrix.row(current_index) = state.relay_info.transpose();
+  state.shared_info_matrix(current_index, current_index) = 0.0;
+  state.value = reward + gamma * state.value;
+  state.current_index = next_index;
   return true;
 }
 
