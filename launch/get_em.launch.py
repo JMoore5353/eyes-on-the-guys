@@ -56,7 +56,10 @@ def generate_launch_description():
         output="screen",
         parameters=[
             autopilot_params,
-            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+            {
+                'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time'),
+                "selection_algorithm": "all",
+            },
         ]
     )
 

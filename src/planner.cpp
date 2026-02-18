@@ -315,86 +315,97 @@ double Planner::compute_horizontal_distance_to_target()
 void Planner::plot_state()
 {
   using namespace matplot;
-  auto fig = gcf();
-  fig->quiet_mode(true);
-  cla();
 
-  // Define colors for guys (cycle through a color palette) - must be float arrays
-  std::vector<std::array<float, 3>> colors = {
-    {0.12f, 0.47f, 0.71f},  // blue
-    {1.00f, 0.50f, 0.05f},  // orange
-    {0.17f, 0.63f, 0.17f},  // green
-    {0.84f, 0.15f, 0.16f},  // red
-    {0.58f, 0.40f, 0.74f},  // purple
-    {0.55f, 0.34f, 0.29f},  // brown
-    {0.89f, 0.47f, 0.76f},  // pink
-    {0.50f, 0.50f, 0.50f},  // gray
-    {0.74f, 0.74f, 0.13f},  // olive
-    {0.09f, 0.75f, 0.81f}   // cyan
-  };
+  auto plot_guys_and_uav = [&](matplot::figure_handle fig) {
+    fig->quiet_mode(true);
+    // cla();
 
-  size_t color_idx = 0;
+    std::vector<std::array<float, 3>> colors = {
+      {0.12f, 0.47f, 0.71f},  // blue
+      {1.00f, 0.50f, 0.05f},  // orange
+      {0.17f, 0.63f, 0.17f},  // green
+      {0.84f, 0.15f, 0.16f},  // red
+      {0.58f, 0.40f, 0.74f},  // purple
+      {0.55f, 0.34f, 0.29f},  // brown
+      {0.89f, 0.47f, 0.76f},  // pink
+      {0.50f, 0.50f, 0.50f},  // gray
+      {0.74f, 0.74f, 0.13f},  // olive
+      {0.09f, 0.75f, 0.81f}   // cyan
+    };
 
-  // Plot each guy
-  for (const auto& [name, pose] : guy_poses_) {
-    std::vector<double> x = {pose.pose.position.x};
-    std::vector<double> y = {pose.pose.position.y};
+    size_t color_idx = 0;
+    for (const auto& [name, pose] : guy_poses_) {
+      std::vector<double> x = {pose.pose.position.x};
+      std::vector<double> y = {pose.pose.position.y};
+      const auto& color = colors[color_idx % colors.size()];
 
-    const auto& color = colors[color_idx % colors.size()];
-
-    if (has_target_ && name == current_target_guy_) {
-      // Selected guy: square marker
-      auto s = scatter(x, y);
-      s->marker(line_spec::marker_style::square);
-      s->marker_size(10);
-      s->marker_color(color);
-      s->marker_face_color(color);
-      s->display_name(name + " (next)");
-    } else {
-      // Non-selected guys: circle marker
       auto s = scatter(x, y);
       s->marker(line_spec::marker_style::circle);
+      s->display_name(name);
       s->marker_size(10);
       s->marker_color(color);
       s->marker_face_color(color);
-      s->display_name(name);
+
+      hold(on);
+      color_idx++;
     }
 
-    hold(on);
-    color_idx++;
-  }
+    // Plot UAV as black triangle
+    std::vector<double> uav_x = {current_eyes_state_.p_n};
+    std::vector<double> uav_y = {current_eyes_state_.p_e};
 
-  // Plot UAV as black triangle
-  std::vector<double> uav_x = {current_eyes_state_.p_n};
-  std::vector<double> uav_y = {current_eyes_state_.p_e};
+    auto uav = scatter(uav_x, uav_y);
+    uav->marker(line_spec::marker_style::upward_pointing_triangle);
+    uav->marker_size(12);
+    uav->marker_color({0.0f, 0.0f, 0.0f});
+    uav->marker_face_color({0.0f, 0.0f, 0.0f});
+    uav->display_name("UAV");
+  };
 
-  auto uav = scatter(uav_x, uav_y);
-  uav->marker(line_spec::marker_style::upward_pointing_triangle);
-  uav->marker_size(12);
-  uav->marker_color({0.0f, 0.0f, 0.0f});
-  uav->marker_face_color({0.0f, 0.0f, 0.0f});
-  uav->display_name("UAV");
+  auto set_labels_and_limits = [&](const std::string& title_str) {
+    xlabel("North (m)");
+    ylabel("East (m)");
+    title(title_str);
+    auto lgd = legend();
+    grid(on);
+    axis(equal);
+    xlim({-600, 1200});
+    ylim({-600, 600});
+  };
 
-  // Plot the target sequence
-  if (this->get_parameter("selection_algorithm").as_string() != "all") {
+  std::string selection_algo = this->get_parameter("selection_algorithm").as_string();
+
+  if (selection_algo != "all") {
+    auto fig = gcf();
+    plot_guys_and_uav(fig);
     plot_sequence(current_target_sequence_, "r-", "Plan");
+    set_labels_and_limits("Eyes on the Guys - UAV Tracking");
+    fig->draw();
   } else {
-    plot_sequence(mcts_sequence_, "r-", "MCTS Plan");
-    plot_sequence(bnb_sequence_, "k-", "Branch'n'Bound Plan");
-    plot_sequence(fs_sequence_, "b-", "Forward Search Plan");
-    plot_sequence(seq_sequence_, "g-", "Sequential Plan");
+    std::vector<std::tuple<std::vector<std::string>, std::string, std::string, std::string>> plans = {
+      {mcts_sequence_, "r-", "Plan", "MCTS"},
+      {bnb_sequence_, "k-", "Plan", "Branch'n'Bound"},
+      {fs_sequence_, "b-", "Plan", "Forward Search"},
+      {seq_sequence_, "g-", "Plan", "Sequential"}
+    };
+
+    if (figure_vector_.size() != plans.size()) {
+      figure_vector_.clear();
+      for (size_t i = 0; i < plans.size(); ++i) {
+        figure_vector_.push_back(figure(true));
+      }
+    }
+
+    for (size_t i = 0; i < plans.size(); ++i) {
+      const auto& [sequence, style, legend_name, window_title] = plans[i];
+      auto& fig = figure_vector_[i];
+      figure(fig);
+      plot_guys_and_uav(fig);
+      plot_sequence(sequence, style, legend_name);
+      set_labels_and_limits("Eyes on the Guys - UAV Tracking (" + window_title + ")");
+      fig->draw();
+    }
   }
-
-  xlabel("North (m)");
-  ylabel("East (m)"); 
-  title("Eyes on the Guys - UAV Tracking");
-  auto lgd = legend();
-  grid(on);
-  axis(equal);
-  xlim({-600, 1200});
-  ylim({-600, 600});
-
-  fig->draw();
 }
 
 void Planner::plot_sequence(const std::vector<std::string>& sequence,
@@ -403,8 +414,8 @@ void Planner::plot_sequence(const std::vector<std::string>& sequence,
 {
   using namespace matplot;
 
-  std::vector<double> x_pos;
-  std::vector<double> y_pos;
+  std::vector<double> x_pos{current_eyes_state_.p_n};
+  std::vector<double> y_pos{current_eyes_state_.p_e};
   for (const std::string& name : sequence) {
     x_pos.push_back(guy_poses_[name].pose.position.x);
     y_pos.push_back(guy_poses_[name].pose.position.y);

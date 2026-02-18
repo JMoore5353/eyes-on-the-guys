@@ -66,6 +66,8 @@ private:
   std::string seq_name_;
   std::vector<std::string> seq_sequence_;
 
+  std::vector<matplot::figure_handle> figure_vector_;
+
   // Callbacks
   void eyes_state_callback(const rosplane_msgs::msg::State & msg);
   void guy_pose_callback(const geometry_msgs::msg::PoseStamped & msg);
