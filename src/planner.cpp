@@ -14,6 +14,7 @@
 #include "planner.hpp"
 #include "forward_search_solver.hpp"
 #include "monte_carlo_tree_search.hpp"
+#include "branch_and_bound_solver.hpp"
 #include "eyes_on_guys_problem.hpp"
 
 using namespace std::chrono_literals;
@@ -134,6 +135,12 @@ void Planner::declare_parameters()
   this->declare_parameter("forward_search_info_shared_weight", 10.0);
   this->declare_parameter("forward_search_path_length_weight", 1.0);
   this->declare_parameter("forward_search_time_since_visit_weight", 10.0);
+  this->declare_parameter("bnb_plan_depth", 7);
+  this->declare_parameter("bnb_max_depth", 20);
+  this->declare_parameter("bnb_max_iterations", 100000);
+  this->declare_parameter("bnb_discount_factor", 0.9);
+  this->declare_parameter("bnb_debug_mode", false);
+  this->declare_parameter("bnb_enable_pruning", true);
 }
 
 void Planner::eyes_state_callback(const rosplane_msgs::msg::State & msg)
@@ -350,7 +357,7 @@ void Planner::plot_state()
   uav->display_name("UAV");
 
   xlabel("North (m)");
-  ylabel("East (m)");
+  ylabel("East (m)"); 
   title("Eyes on the Guys - UAV Tracking");
   legend();
   grid(on);
@@ -364,7 +371,6 @@ void Planner::plot_state()
 void Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
 {
   int num_agents = static_cast<int>(guy_names.size());
-
   std::vector<std::string>::const_iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
   int initial_state = std::distance(guy_names.begin(), it);
 
@@ -388,7 +394,25 @@ void Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
 
 void Planner::find_next_guy_with_branch_and_bound(const std::vector<std::string>& guy_names)
 {
-  find_next_guy_sequentially(guy_names);
+  int num_agents = static_cast<int>(guy_names.size());
+  std::vector<std::string>::const_iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
+  int initial_state = std::distance(guy_names.begin(), it);
+
+  BranchAndBoundSolver bnb_solver{num_agents,
+                                  (int)this->get_parameter("bnb_max_depth").as_int(),
+                                  (int)this->get_parameter("bnb_max_iterations").as_int(),
+                                  this->get_parameter("bnb_discount_factor").as_double(),
+                                  this->get_parameter("bnb_debug_mode").as_bool(),
+                                  this->get_parameter("bnb_enable_pruning").as_bool()};
+  std::vector<int> optimal_sequence = bnb_solver.solve(initial_state, problem_info_);
+
+  current_target_guy_ = guy_names.at(optimal_sequence.at(0));
+  current_target_sequence_.clear();
+  int64_t depth = std::min(this->get_parameter("bnb_plan_depth").as_int(), (int64_t)optimal_sequence.size());
+  for (int64_t i=0; i<depth; ++i) {
+    int idx = optimal_sequence.at(i);
+    current_target_sequence_.push_back(guy_names.at(idx));
+  }
 }
 
 void Planner::find_next_guy_with_forward_search(const std::vector<std::string>& guy_names)
