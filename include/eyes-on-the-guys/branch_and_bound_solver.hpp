@@ -10,9 +10,6 @@
 
 #include "eyes_on_guys_problem.hpp"
 
-// Multiplier for encouraging deep search rather than wide search
-// 
-const double TUNNELING_WEIGHT_PARAM = 0.5;
 
 namespace eyes_on_guys
 {
@@ -68,14 +65,12 @@ private:
   struct Node
   {
     // q_max: optimistic upper bound on total achievable reward from this node.
-    // weighted_q_max: q_max weighted by depth to encourage deeper search.
     // path: sequence of actions taken from root to reach this node (last element is current state).
     // reward: accumulated discounted reward along path.
     // depth/problem/id: search bookkeeping for expansion and indexing.
-    Node(double q_max, double weighted_q_max, std::vector<int> path, double reward,
+    Node(double q_max, std::vector<int> path, double reward,
          int depth, EyesOnGuysProblem problem, std::size_t id)
         : q_max(q_max)
-        , weighted_q_max(weighted_q_max)
         , path(std::move(path))
         , reward(reward)
         , depth(depth)
@@ -84,7 +79,6 @@ private:
     {}
 
     double q_max;
-    double weighted_q_max;
     std::vector<int> path;
     double reward;
     int depth;
@@ -94,7 +88,7 @@ private:
 
   using NodePtr = std::shared_ptr<Node>;
 
-  // Orders unexplored nodes by descending q_max so begin() is best candidate.
+  // Orders unexplored nodes by descending q_max so begin() is the most promising node.
   struct QMaxComparator
   {
     bool operator()(const NodePtr & lhs, const NodePtr & rhs) const;
@@ -118,7 +112,7 @@ private:
   void add_unexplored_node(const NodePtr & node);
   void erase_unexplored_node(const NodePtr & node);
 
-  // Prunes all unexplored nodes whose weighted_q_max is below the best reward found so far.
+  // Prunes all unexplored nodes whose q_max is at or below the best reward found so far.
   std::size_t prune_nodes();
 
   // Pops the unexplored node with largest q_max.
@@ -145,7 +139,7 @@ private:
   bool enable_pruning_;
 
   // Unexplored nodes indexed by descending q_max for pop/prune operations.
-  std::multiset<NodePtr, QMaxComparator> unexplored_nodes_by_q_max_;
+  std::multiset<NodePtr, QMaxComparator> unexplored_nodes_;
 
   // Runtime search counters.
   std::size_t next_node_id_;

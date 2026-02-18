@@ -39,13 +39,13 @@ TEST_F(BranchAndBoundTest, OrderingsAreCorrect_Qmax)
   std::multiset<BranchAndBoundSolver::NodePtr, BranchAndBoundSolver::QMaxComparator> nodes;
 
   nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    5.0, 5.0, std::vector<int>{1}, 0.0, 0, problem, 3U));
+    5.0, std::vector<int>{1}, 0.0, 0, problem, 3U));
   nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    10.0, 10.0, std::vector<int>{2}, 0.0, 0, problem, 2U));
+    10.0, std::vector<int>{2}, 0.0, 0, problem, 2U));
   nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    7.0, 7.0, std::vector<int>{3}, 0.0, 0, problem, 4U));
+    7.0, std::vector<int>{3}, 0.0, 0, problem, 4U));
   nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    10.0, 10.0, std::vector<int>{4}, 0.0, 0, problem, 1U));
+    10.0, std::vector<int>{4}, 0.0, 0, problem, 1U));
 
   ASSERT_EQ(nodes.size(), 4U);
 
@@ -103,13 +103,13 @@ TEST_F(BranchAndBoundTest, AddUnexploredNodeAddsNodeToAllIndexes)
 
   const BranchAndBoundSolver::NodePtr node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      2.0, 2.0, std::vector<int>{1}, 3.0, 1, problem, 42U);
+      2.0, std::vector<int>{1}, 3.0, 1, problem, 42U);
 
   solver.add_unexplored_node(node);
 
-  ASSERT_EQ(solver.unexplored_nodes_by_q_max_.size(), 1U);
+  ASSERT_EQ(solver.unexplored_nodes_.size(), 1U);
 
-  EXPECT_EQ(*solver.unexplored_nodes_by_q_max_.begin(), node);
+  EXPECT_EQ(*solver.unexplored_nodes_.begin(), node);
 }
 
 TEST_F(BranchAndBoundTest, EraseUnexploredNodeRemovesNodeFromAllIndexes)
@@ -120,20 +120,20 @@ TEST_F(BranchAndBoundTest, EraseUnexploredNodeRemovesNodeFromAllIndexes)
 
   const BranchAndBoundSolver::NodePtr node_to_keep =
     std::make_shared<BranchAndBoundSolver::Node>(
-      3.0, 3.0, std::vector<int>{1}, 0.0, 1, problem, 10U);
+      3.0, std::vector<int>{1}, 0.0, 1, problem, 10U);
   const BranchAndBoundSolver::NodePtr node_to_erase =
     std::make_shared<BranchAndBoundSolver::Node>(
-      4.0, 4.0, std::vector<int>{2}, 0.0, 1, problem, 11U);
+      4.0, std::vector<int>{2}, 0.0, 1, problem, 11U);
 
   solver.add_unexplored_node(node_to_keep);
   solver.add_unexplored_node(node_to_erase);
-  ASSERT_EQ(solver.unexplored_nodes_by_q_max_.size(), 2U);
+  ASSERT_EQ(solver.unexplored_nodes_.size(), 2U);
 
   solver.erase_unexplored_node(node_to_erase);
 
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.size(), 1U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(node_to_erase), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(node_to_keep), 1U);
+  EXPECT_EQ(solver.unexplored_nodes_.size(), 1U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(node_to_erase), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(node_to_keep), 1U);
 }
 
 TEST_F(BranchAndBoundTest, PruneNodesWithQMaxBelowRemovesOnlyThresholdMatches)
@@ -144,35 +144,35 @@ TEST_F(BranchAndBoundTest, PruneNodesWithQMaxBelowRemovesOnlyThresholdMatches)
 
   const BranchAndBoundSolver::NodePtr node_below_1 =
     std::make_shared<BranchAndBoundSolver::Node>(
-      2.0, 2.0, std::vector<int>{1}, 0.0, 1, problem, 50U);
+      2.0, std::vector<int>{1}, 0.0, 1, problem, 50U);
   const BranchAndBoundSolver::NodePtr node_below_2 =
     std::make_shared<BranchAndBoundSolver::Node>(
-      3.5, 3.5, std::vector<int>{2}, 0.0, 1, problem, 51U);
+      3.5, std::vector<int>{2}, 0.0, 1, problem, 51U);
   const BranchAndBoundSolver::NodePtr node_at_threshold =
     std::make_shared<BranchAndBoundSolver::Node>(
-      5.0, 5.0, std::vector<int>{3}, 0.0, 1, problem, 52U);
+      5.0, std::vector<int>{3}, 0.0, 1, problem, 52U);
   const BranchAndBoundSolver::NodePtr node_above =
     std::make_shared<BranchAndBoundSolver::Node>(
-      7.0, 7.0, std::vector<int>{4}, 0.0, 1, problem, 53U);
+      7.0, std::vector<int>{4}, 0.0, 1, problem, 53U);
 
   solver.add_unexplored_node(node_below_1);
   solver.add_unexplored_node(node_below_2);
   solver.add_unexplored_node(node_at_threshold);
   solver.add_unexplored_node(node_above);
 
-  ASSERT_EQ(solver.unexplored_nodes_by_q_max_.size(), 4U);
+  ASSERT_EQ(solver.unexplored_nodes_.size(), 4U);
 
   // Set the best reward to 5.0 to test pruning behavior
   solver.best_reward_ = 5.0;
   const std::size_t pruned = solver.prune_nodes();
 
   EXPECT_EQ(pruned, 3U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.size(), 1U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(node_below_1), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(node_below_2), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(node_at_threshold), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(node_above), 1U);
-  EXPECT_EQ(*solver.unexplored_nodes_by_q_max_.begin(), node_above);
+  EXPECT_EQ(solver.unexplored_nodes_.size(), 1U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(node_below_1), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(node_below_2), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(node_at_threshold), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(node_above), 1U);
+  EXPECT_EQ(*solver.unexplored_nodes_.begin(), node_above);
 }
 
 TEST_F(BranchAndBoundTest, PopNodeWithHighestQMaxReturnsAndRemovesBestNode)
@@ -183,13 +183,13 @@ TEST_F(BranchAndBoundTest, PopNodeWithHighestQMaxReturnsAndRemovesBestNode)
 
   const BranchAndBoundSolver::NodePtr low_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      2.0, 2.0, std::vector<int>{1}, 0.0, 1, problem, 30U);
+      2.0, std::vector<int>{1}, 0.0, 1, problem, 30U);
   const BranchAndBoundSolver::NodePtr best_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      5.0, 5.0, std::vector<int>{2}, 0.0, 1, problem, 31U);
+      5.0, std::vector<int>{2}, 0.0, 1, problem, 31U);
   const BranchAndBoundSolver::NodePtr mid_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      3.0, 3.0, std::vector<int>{3}, 0.0, 1, problem, 32U);
+      3.0, std::vector<int>{3}, 0.0, 1, problem, 32U);
 
   solver.add_unexplored_node(low_node);
   solver.add_unexplored_node(best_node);
@@ -199,10 +199,10 @@ TEST_F(BranchAndBoundTest, PopNodeWithHighestQMaxReturnsAndRemovesBestNode)
   ASSERT_NE(popped, nullptr);
   EXPECT_EQ(popped, best_node);
   EXPECT_DOUBLE_EQ(popped->q_max, 5.0);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.size(), 2U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(best_node), 0U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(low_node), 1U);
-  EXPECT_EQ(solver.unexplored_nodes_by_q_max_.count(mid_node), 1U);
+  EXPECT_EQ(solver.unexplored_nodes_.size(), 2U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(best_node), 0U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(low_node), 1U);
+  EXPECT_EQ(solver.unexplored_nodes_.count(mid_node), 1U);
 }
 
 TEST_F(BranchAndBoundTest, ProblemDimensionsAreValidChecksKeyShapeMismatchCases)
@@ -231,16 +231,16 @@ TEST_F(BranchAndBoundTest, MaybeUpdateBestSolutionTracksHighestRewardNonEmptyPat
   const BranchAndBoundSolver::NodePtr null_node = nullptr;
   const BranchAndBoundSolver::NodePtr empty_path_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      0.0, 0.0, std::vector<int>{}, 10.0, 1, problem, 40U);
+      0.0, std::vector<int>{}, 10.0, 1, problem, 40U);
   const BranchAndBoundSolver::NodePtr low_reward_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      0.0, 0.0, std::vector<int>{1}, 5.0, 1, problem, 41U);
+      0.0, std::vector<int>{1}, 5.0, 1, problem, 41U);
   const BranchAndBoundSolver::NodePtr high_reward_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      0.0, 0.0, std::vector<int>{2, 3}, 8.0, 1, problem, 42U);
+      0.0, std::vector<int>{2, 3}, 8.0, 1, problem, 42U);
   const BranchAndBoundSolver::NodePtr lower_late_node =
     std::make_shared<BranchAndBoundSolver::Node>(
-      0.0, 0.0, std::vector<int>{0, 1}, 7.0, 1, problem, 43U);
+      0.0, std::vector<int>{0, 1}, 7.0, 1, problem, 43U);
 
   solver.maybe_update_best_solution(null_node);
   EXPECT_EQ(solver.best_path_.size(), 0U);
@@ -562,163 +562,6 @@ TEST_F(BranchAndBoundTest, QMaxIsConsistentWithAntiGreedyPath)
   EXPECT_DOUBLE_EQ(upper, path_reward + manual_reward);
 }
 
-TEST_F(BranchAndBoundTest, UMinEqualsPathReward)
-{
-  // This test is no longer relevant since u_min has been removed
-  // The threshold is now based exclusively on the best reward found
-  SUCCEED();
-}
-
-TEST_F(BranchAndBoundTest, WeightingParameterAffectsNodeOrdering)
-{
-  // Test that different TUNNELING_WEIGHT_PARAM values result in different node orderings
-  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
-
-  // Create nodes with same q_max but different depths
-  // Node A: high q_max, shallow depth
-  const BranchAndBoundSolver::NodePtr node_shallow_high =
-    std::make_shared<BranchAndBoundSolver::Node>(
-      10.0, 10.0, std::vector<int>{0, 1}, 5.0, 1, problem, 1U);
-  
-  // Node B: lower q_max, deeper depth
-  const BranchAndBoundSolver::NodePtr node_deep_lower =
-    std::make_shared<BranchAndBoundSolver::Node>(
-      8.0, 8.0, std::vector<int>{0, 1, 2, 3}, 3.0, 3, problem, 2U);
-
-  // Test with zero weight (should prioritize by q_max only)
-  {
-    std::multiset<BranchAndBoundSolver::NodePtr, BranchAndBoundSolver::QMaxComparator> nodes;
-    nodes.insert(node_shallow_high);
-    nodes.insert(node_deep_lower);
-    
-    auto it = nodes.begin();
-    EXPECT_EQ(*it, node_shallow_high);  // Higher q_max should be preferred
-  }
-
-  // Create nodes with calculated weighted_q_max values to test positive weight
-  // Node C: moderate q_max, deep depth
-  const BranchAndBoundSolver::NodePtr node_deep_moderate =
-    std::make_shared<BranchAndBoundSolver::Node>(
-      6.0, (0.3 * 3 + 1.0) * 6.0, std::vector<int>{0, 1, 2}, 2.0, 2, problem, 3U);
-  
-  // Node D: high q_max, shallow depth  
-  const BranchAndBoundSolver::NodePtr node_shallow_moderate =
-    std::make_shared<BranchAndBoundSolver::Node>(
-      7.0, (0.3 * 1 + 1.0) * 7.0, std::vector<int>{0, 2}, 3.0, 1, problem, 4U);
-
-  // With positive weight, the deep node should be preferred due to weighting
-  EXPECT_GT(node_deep_moderate->weighted_q_max, node_shallow_moderate->weighted_q_max);
-}
-
-TEST_F(BranchAndBoundTest, WeightingParameterZeroWeightPreservesQMaxOrdering)
-{
-  // Test that with zero weight, ordering is purely by q_max
-  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
-
-  std::multiset<BranchAndBoundSolver::NodePtr, BranchAndBoundSolver::QMaxComparator> nodes;
-
-  // Create nodes with different q_max values
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    5.0, 5.0, std::vector<int>{1}, 2.0, 1, problem, 1U));
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    10.0, 10.0, std::vector<int>{2}, 3.0, 1, problem, 2U));
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    7.0, 7.0, std::vector<int>{3}, 1.0, 1, problem, 3U));
-  nodes.insert(std::make_shared<BranchAndBoundSolver::Node>(
-    10.0, 10.0, std::vector<int>{4}, 2.0, 1, problem, 4U));
-
-  ASSERT_EQ(nodes.size(), 4U);
-
-  // Should be ordered by q_max (descending), then by ID for ties
-  auto it = nodes.begin();
-  EXPECT_EQ((*it)->id, 2U);  // First q_max=10.0, lower ID
-  EXPECT_DOUBLE_EQ((*it)->q_max, 10.0);
-
-  ++it;
-  EXPECT_EQ((*it)->id, 4U);  // Second q_max=10.0, higher ID
-  EXPECT_DOUBLE_EQ((*it)->q_max, 10.0);
-
-  ++it;
-  EXPECT_EQ((*it)->id, 3U);  // q_max=7.0
-  EXPECT_DOUBLE_EQ((*it)->q_max, 7.0);
-
-  ++it;
-  EXPECT_EQ((*it)->id, 1U);  // q_max=5.0
-  EXPECT_DOUBLE_EQ((*it)->q_max, 5.0);
-}
-
-TEST_F(BranchAndBoundTest, WeightingParameterDeepNodesPreferredWithPositiveWeight)
-{
-  // Test that positive weighting favors deeper nodes even with lower q_max
-  EyesOnGuysProblem problem{num_agents, relay_speed, distance_between_agents};
-
-  // Create two nodes where deeper node has lower q_max but higher weighted_q_max
-  const double weight = 0.5;
-  
-  // Shallow node: q_max=8.0, depth=1, weighted_q_max = (0.5*1+1)*8.0 = 12.0
-  const BranchAndBoundSolver::NodePtr node_shallow =
-    std::make_shared<BranchAndBoundSolver::Node>(
-      8.0, (weight * 1 + 1.0) * 8.0, std::vector<int>{0, 1}, 2.0, 1, problem, 1U);
-  
-  // Deep node: q_max=6.0, depth=3, weighted_q_max = (0.5*3+1)*6.0 = 15.0
-  const BranchAndBoundSolver::NodePtr node_deep =
-    std::make_shared<BranchAndBoundSolver::Node>(
-      6.0, (weight * 3 + 1.0) * 6.0, std::vector<int>{0, 1, 2, 3}, 1.0, 3, problem, 2U);
-
-  // Deep node should have higher weighted_q_max despite lower q_max
-  EXPECT_GT(node_deep->weighted_q_max, node_shallow->weighted_q_max);
-  EXPECT_LT(node_deep->q_max, node_shallow->q_max);
-
-  // Test ordering in multiset
-  std::multiset<BranchAndBoundSolver::NodePtr, BranchAndBoundSolver::QMaxComparator> nodes;
-  nodes.insert(node_shallow);
-  nodes.insert(node_deep);
-
-  auto it = nodes.begin();
-  EXPECT_EQ(*it, node_deep);  // Deep node should be first due to higher weighted_q_max
-}
-
-TEST_F(BranchAndBoundTest, WeightingParameterAffectsSolverPathSelection)
-{
-  // Test that different weights can lead to different path selections
-  // This test creates a scenario where weighting influences the search order
-  
-  // Create a simple problem where we can control the rewards
-  const int test_agents = 3;
-  Eigen::MatrixXd test_distances = Eigen::MatrixXd::Zero(test_agents, test_agents);
-  test_distances << 0, 1, 2,
-                    1, 0, 1,
-                    2, 1, 0;
-  
-  EyesOnGuysProblem problem{test_agents, 1.0, test_distances};
-  
-  // Test with zero weight (should find shortest path by reward)
-  {
-    BranchAndBoundSolver solver{test_agents, 3, 1000, 0.9, false};
-    const std::vector<int> result_zero_weight = solver.solve(0, problem);
-    
-    // Should find a valid path
-    ASSERT_FALSE(result_zero_weight.empty());
-    EXPECT_EQ(result_zero_weight[0], 0);
-    EXPECT_EQ(result_zero_weight.size(), 4U);  // depth 3 + initial state
-  }
-  
-  // Test with positive weight (might explore deeper paths first)
-  {
-    BranchAndBoundSolver solver{test_agents, 3, 1000, 0.9, false};
-    const std::vector<int> result_positive_weight = solver.solve(0, problem);
-    
-    // Should also find a valid path
-    ASSERT_FALSE(result_positive_weight.empty());
-    EXPECT_EQ(result_positive_weight[0], 0);
-    EXPECT_EQ(result_positive_weight.size(), 4U);  // depth 3 + initial state
-  }
-  
-  // The key insight is that weighting affects the order of node exploration,
-  // which can affect which optimal path is found first when multiple paths have similar rewards
-  // We can't easily predict which path will be chosen, but we can verify the solver works
-}
-
 // ============================================================================
 // Performance Test (keep this as the last unit test)
 // ============================================================================
@@ -727,7 +570,7 @@ TEST_F(BranchAndBoundTest, PerformanceTestLargeProblem)
 {
   // Test parameters - adjust these to explore different problem sizes
   const int num_agents = 6;
-  const int test_depth = 7;  // Adjust between 1-10 to test different depths
+  const int test_depth = 10;  // Adjust between 1-10 to test different depths
   const int max_iterations = 5000000;  // Large enough to not limit the search
   
   // Create a realistic distance matrix for 6 agents

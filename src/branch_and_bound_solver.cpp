@@ -29,8 +29,8 @@ BranchAndBoundSolver::BranchAndBoundSolver(int num_states, int max_depth, int ma
 bool BranchAndBoundSolver::QMaxComparator::operator()(const NodePtr & lhs,
                                                       const NodePtr & rhs) const
 {
-  if (lhs->weighted_q_max != rhs->weighted_q_max) {
-    return lhs->weighted_q_max > rhs->weighted_q_max;
+  if (lhs->q_max != rhs->q_max) {
+    return lhs->q_max > rhs->q_max;
   }
   return lhs->id < rhs->id;
 }
@@ -79,7 +79,7 @@ std::vector<int> BranchAndBoundSolver::anti_greedy_path(
   int curr_depth = depth;
   std::vector<int> result_path;
 
-  // Set rows of current path to zero
+  // Zero out rows of visited states so they won't be selected when searching columns
   for (int state : current_path) {
     dist_matrix.row(state).setZero();
   }
@@ -90,16 +90,16 @@ std::vector<int> BranchAndBoundSolver::anti_greedy_path(
       dist_matrix = problem_state.distance_between_agents;
     }
     
-    // Find the index of the largest value in the row of the current state
+    // Find the index of the largest value in the column of the current state
     int max_idx;
-    dist_matrix.row(curr_state).maxCoeff(&max_idx);
+    dist_matrix.col(curr_state).maxCoeff(&max_idx);
 
     // Move to this state and add it to the path
     result_path.push_back(max_idx);
     curr_state = max_idx;
     curr_depth++;
 
-    // Set row of current state to zero
+    // Zero out row of new current state to prevent revisiting
     dist_matrix.row(curr_state).setZero();
   }
   
@@ -115,7 +115,7 @@ BranchAndBoundSolver::NodePtr BranchAndBoundSolver::make_node(
   double upper = q_max(curr_state, path, problem_state, reward, depth);
 
   NodePtr out = std::make_shared<Node>(
-    upper, (TUNNELING_WEIGHT_PARAM * depth + 1.0) * upper, std::move(path), reward, depth,
+    upper, std::move(path), reward, depth,
     std::move(problem_state), next_node_id_);
 
   ++next_node_id_;
@@ -130,7 +130,7 @@ void BranchAndBoundSolver::add_unexplored_node(const NodePtr & node)
     return;
   }
 
-  unexplored_nodes_by_q_max_.insert(node);
+  unexplored_nodes_.insert(node);
 }
 
 // Remove node from the unexplored q_max index.
@@ -140,39 +140,34 @@ void BranchAndBoundSolver::erase_unexplored_node(const NodePtr & node)
     return;
   }
 
-  auto q_max_it = unexplored_nodes_by_q_max_.find(node);
-  if (q_max_it != unexplored_nodes_by_q_max_.end()) {
-    unexplored_nodes_by_q_max_.erase(q_max_it);
+  auto q_max_it = unexplored_nodes_.find(node);
+  if (q_max_it != unexplored_nodes_.end()) {
+    unexplored_nodes_.erase(q_max_it);
   }
 }
 
-// Prune unexplored nodes that cannot beat the incumbent threshold.
+// Prune all unexplored nodes whose q_max cannot beat the incumbent best reward.
 std::size_t BranchAndBoundSolver::prune_nodes()
 {
   std::size_t pruned_count{0U};
 
-  while (!unexplored_nodes_by_q_max_.empty()) {
-    auto worst_it = std::prev(unexplored_nodes_by_q_max_.end());
-    if ((*worst_it)->q_max > best_reward_) {
-      break;
-    }
+  auto first_prunable = std::find_if(unexplored_nodes_.begin(), unexplored_nodes_.end(),
+                                     [this](const NodePtr& node) { return node->q_max <= best_reward_; });
 
-    unexplored_nodes_by_q_max_.erase(worst_it);
-    ++pruned_count;
-  }
+  pruned_count = std::distance(first_prunable, unexplored_nodes_.end());
+  unexplored_nodes_.erase(first_prunable, unexplored_nodes_.end());
 
-  total_pruned_nodes_ += pruned_count;
   return pruned_count;
 }
 
 // Return and remove the node with highest optimistic bound.
 BranchAndBoundSolver::NodePtr BranchAndBoundSolver::pop_node_with_highest_q_max()
 {
-  if (unexplored_nodes_by_q_max_.empty()) {
+  if (unexplored_nodes_.empty()) {
     return nullptr;
   }
 
-  auto best_it = unexplored_nodes_by_q_max_.begin();
+  auto best_it = unexplored_nodes_.begin();
   NodePtr best_node = *best_it;
   erase_unexplored_node(best_node);
 
@@ -220,7 +215,7 @@ void BranchAndBoundSolver::maybe_print_debug_info() const
 // Reset all mutable search state so the solver can be reused across calls.
 void BranchAndBoundSolver::reset()
 {
-  unexplored_nodes_by_q_max_.clear();
+  unexplored_nodes_.clear();
   next_node_id_ = 0U;
   explored_nodes_count_ = 0U;
   completed_paths_count_ = 0U;
@@ -240,11 +235,16 @@ std::vector<int> BranchAndBoundSolver::solve(int initial_state, const EyesOnGuys
     return {};
   }
 
+  // Validate that initial_state is within bounds
+  if (initial_state < 0 || initial_state >= num_states_) {
+    return {};
+  }
+
   // Initialize the search with the initial state
   add_unexplored_node(make_node(0, {initial_state}, 0.0, problem_info));
 
   int iteration = 0;
-  while (!unexplored_nodes_by_q_max_.empty() && iteration < max_iterations_) {
+  while (!unexplored_nodes_.empty() && iteration < max_iterations_) {
     // Explore the current best option
     NodePtr max_node = pop_node_with_highest_q_max();
     ++explored_nodes_count_;

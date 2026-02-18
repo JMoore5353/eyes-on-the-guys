@@ -50,10 +50,10 @@ protected:
     EXPECT_EQ(result_without_pruning[0], initial_state);
 
     // Both should find reasonable rewards (pruning may find suboptimal due to heuristic bounds)
-    // The reward with pruning should be at least 80% of the reward without pruning
+    // The reward with pruning should be at least 90% of the reward without pruning
     EXPECT_GT(solver_with_pruning.best_reward_, 
-              0.8 * solver_without_pruning.best_reward_)
-      << "Pruning should find a reasonably good solution (at least 80% of optimal)";
+              0.9 * solver_without_pruning.best_reward_)
+      << "Pruning should find a reasonably good solution (at least 90% of optimal)";
     
     // Note: We don't require identical paths because pruning uses heuristic upper bounds
     // that may cause it to prune away optimal paths in favor of exploring other paths first
