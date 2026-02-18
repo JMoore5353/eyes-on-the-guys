@@ -86,7 +86,8 @@ if(Matplot++_FOUND)
 else()
   target_link_libraries(planner matplot)
 endif()
-target_link_libraries(planner monte_carlo_tree_search "${cpp_typesupport_target}")
+target_link_libraries(planner monte_carlo_tree_search forward_search_solver "${cpp_typesupport_target}")
+
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
@@ -120,16 +121,15 @@ target_link_libraries(monte_carlo_tree_search PUBLIC Eigen3::Eigen)
 ##  SOLVERS  ##
 ###############
 
-add_executable(forward_search
+add_library(forward_search_solver
   src/forward_search_solver.cpp)
-target_include_directories(forward_search
-  PRIVATE
+target_include_directories(forward_search_solver
+  PUBLIC
     include/eyes-on-the-guys)
-ament_target_dependencies(forward_search rclcpp geometry_msgs std_srvs Eigen3)
-rosidl_target_interfaces(forward_search
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
+target_link_libraries(forward_search_solver Eigen3::Eigen)
+ament_target_dependencies(forward_search_solver geometry_msgs Eigen3)
 install(
-  TARGETS forward_search
+  TARGETS forward_search_solver
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -156,6 +156,7 @@ if(BUILD_TESTING)
   add_executable(unit_tests
     test/monte_carlo_node_test.cpp
     test/monte_carlo_tree_search_test.cpp
+    test/forward_search_solver_test.cpp
     test/eyes_on_guys_problem_test.cpp
     test/planner_test.cpp
     src/planner.cpp
@@ -167,6 +168,7 @@ if(BUILD_TESTING)
     GTest::GTest
     GTest::Main
     monte_carlo_tree_search
+    forward_search_solver
     "${cpp_typesupport_target}"
   )
   if(Matplot++_FOUND)
