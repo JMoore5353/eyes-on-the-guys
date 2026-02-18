@@ -17,21 +17,15 @@ echo "Using container runtime: ${CONTAINER_CLI}"
 echo "Building image ${IMAGE_NAME}..."
 "${CONTAINER_CLI}" build -t "${IMAGE_NAME}" -f "${SCRIPT_DIR}/Dockerfile" "${SCRIPT_DIR}"
 
+XAUTH_FILE="${XAUTHORITY:-${HOME}/.Xauthority}"
 RUN_ARGS=(
     run --rm -it --privileged
     -e "DISPLAY=${DISPLAY}"
     -e "QT_X11_NO_MITSHM=1"
+    -e "XAUTHORITY=/tmp/.Xauthority"
     -v "/tmp/.X11-unix:/tmp/.X11-unix:rw"
+    -v "${XAUTH_FILE}:/tmp/.Xauthority:ro"
 )
-
-XAUTH_FILE="${XAUTHORITY:-${HOME}/.Xauthority}"
-
-if [[ -f "${XAUTH_FILE}" ]]; then
-    RUN_ARGS+=(
-        -e "XAUTHORITY=/tmp/.Xauthority"
-        -v "${XAUTH_FILE}:/tmp/.Xauthority:ro"
-    )
-fi
 
 echo "Starting simulation container..."
 "${CONTAINER_CLI}" "${RUN_ARGS[@]}" "${IMAGE_NAME}"
