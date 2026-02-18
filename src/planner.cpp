@@ -474,6 +474,7 @@ EyesOnGuysProblem Planner::compute_initial_problem_information(const std::vector
   time_of_last_visit_to_any_agent_ = now;
 
   problem_info_.update_time_since_last_visit(current_state, dt_sec);
+  problem_info_.update_distance_matrix(compute_distance_between_guys(guy_names, guy_poses_));
 }
 
 Eigen::MatrixXd compute_distance_between_guys(const std::vector<std::string>& guy_names,

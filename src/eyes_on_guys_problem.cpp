@@ -55,6 +55,11 @@ void EyesOnGuysProblem::update_time_since_last_visit(const int curr_state, const
   time_since_last_relay_contact_with_agent[curr_state] = 0.0;
 }
 
+void EyesOnGuysProblem::update_distance_matrix(const Eigen::MatrixXd & dists)
+{
+  distance_between_agents = dists;
+}
+
 double simulate_agent_info_gain(const double time_since_last_visit)
 {
   // TODO: (PREDICTIVE_MODEL) Replace this placeholder with the information-gain model.
