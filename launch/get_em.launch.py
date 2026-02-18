@@ -40,7 +40,12 @@ def generate_launch_description():
         name="guy_sim",
         output="screen",
         parameters=[
-            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time')},
+            {'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time'),
+             'init_max_x': 500.0,
+             'init_min_x': -500.0,
+             'init_max_y': 500.0,
+             'init_min_y': -500.0,
+            },
         ],
     )
 

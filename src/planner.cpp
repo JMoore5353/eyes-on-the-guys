@@ -113,6 +113,9 @@ Planner::Planner()
     std::bind(&Planner::planning_timer_callback, this));
 
   RCLCPP_INFO(this->get_logger(), "Planner initialized at %.1f Hz", planning_rate_hz);
+
+  parameter_callback_handle_ = this->add_on_set_parameters_callback(
+    std::bind(&Planner::parameters_callback, this, std::placeholders::_1));
 }
 
 void Planner::declare_parameters()
@@ -141,6 +144,20 @@ void Planner::declare_parameters()
   this->declare_parameter("bnb_discount_factor", 0.9);
   this->declare_parameter("bnb_debug_mode", false);
   this->declare_parameter("bnb_enable_pruning", true);
+}
+
+rcl_interfaces::msg::SetParametersResult Planner::parameters_callback(const std::vector<rclcpp::Parameter> & parameters)
+{
+  rcl_interfaces::msg::SetParametersResult res;
+  res.successful = true;
+  res.reason = "success";
+
+  for (rclcpp::Parameter param : parameters) {
+    if (param.get_name() == "selection_algorithm") {
+      has_target_ = false;
+    }
+  }
+  return res;
 }
 
 void Planner::eyes_state_callback(const rosplane_msgs::msg::State & msg)
@@ -269,6 +286,8 @@ void Planner::select_new_target_guy()
     find_next_guy_with_forward_search(guy_names);
   } else if (selection_algorithm == "sequential") {
     find_next_guy_sequentially(guy_names);
+  } else if (selection_algorithm == "all") {
+    find_next_guy_using_all_methods(guy_names);
   } else {
     RCLCPP_WARN(this->get_logger(),
                 "Unable to parse selection_algorithm type %s! Defaulting to 'sequential'!",
@@ -330,7 +349,7 @@ void Planner::plot_state()
       s->marker_size(10);
       s->marker_color(color);
       s->marker_face_color(color);
-      s->display_name(name);
+      s->display_name(name + " (next)");
     } else {
       // Non-selected guys: circle marker
       auto s = scatter(x, y);
@@ -356,16 +375,45 @@ void Planner::plot_state()
   uav->marker_face_color({0.0f, 0.0f, 0.0f});
   uav->display_name("UAV");
 
+  // Plot the target sequence
+  if (this->get_parameter("selection_algorithm").as_string() != "all") {
+    plot_sequence(current_target_sequence_, "r-", "Plan");
+  } else {
+    plot_sequence(mcts_sequence_, "r-", "MCTS Plan");
+    plot_sequence(bnb_sequence_, "k-", "Branch'n'Bound Plan");
+    plot_sequence(fs_sequence_, "b-", "Forward Search Plan");
+    plot_sequence(seq_sequence_, "g-", "Sequential Plan");
+  }
+
   xlabel("North (m)");
   ylabel("East (m)"); 
   title("Eyes on the Guys - UAV Tracking");
-  legend();
+  auto lgd = legend();
   grid(on);
   axis(equal);
-  xlim({-600, 600});
+  xlim({-600, 1200});
   ylim({-600, 600});
 
   fig->draw();
+}
+
+void Planner::plot_sequence(const std::vector<std::string>& sequence,
+                            const std::string& line_style,
+                            const std::string& display_name)
+{
+  using namespace matplot;
+
+  std::vector<double> x_pos;
+  std::vector<double> y_pos;
+  for (const std::string& name : sequence) {
+    x_pos.push_back(guy_poses_[name].pose.position.x);
+    y_pos.push_back(guy_poses_[name].pose.position.y);
+  }
+
+  auto target_path = plot(x_pos, y_pos, line_style.c_str());
+  target_path->display_name(display_name.c_str());
+
+  hold(on);
 }
 
 void Planner::find_next_guy_with_mcts(const std::vector<std::string>& guy_names)
@@ -477,6 +525,38 @@ void Planner::find_next_guy_sequentially(const std::vector<std::string>& guy_nam
   }
 
   current_guy_index_++;
+}
+
+void Planner::find_next_guy_using_all_methods(const std::vector<std::string>& guy_names)
+{
+  std::string tmp_guy_name = current_target_guy_;
+
+  find_next_guy_with_mcts(guy_names);
+  mcts_name_ = current_target_guy_;
+  mcts_sequence_ = current_target_sequence_;
+  current_target_guy_ = tmp_guy_name;
+
+  find_next_guy_with_branch_and_bound(guy_names);
+  bnb_name_ = current_target_guy_;
+  bnb_sequence_ = current_target_sequence_;
+  current_target_guy_ = tmp_guy_name;
+
+  find_next_guy_with_forward_search(guy_names);
+  fs_name_ = current_target_guy_;
+  fs_sequence_ = current_target_sequence_;
+  current_target_guy_ = tmp_guy_name;
+
+  find_next_guy_sequentially(guy_names);
+  seq_name_ = current_target_guy_;
+  seq_sequence_ = current_target_sequence_;
+
+  current_target_guy_ = mcts_name_;
+  current_target_sequence_ = mcts_sequence_;
+
+  RCLCPP_INFO_STREAM(this->get_logger(), "MCTS: " << mcts_sequence_.size());
+  RCLCPP_INFO_STREAM(this->get_logger(), "BnB: " << bnb_sequence_.size());
+  RCLCPP_INFO_STREAM(this->get_logger(), "FS: " << fs_sequence_.size());
+  RCLCPP_INFO_STREAM(this->get_logger(), "SEQ: " << seq_sequence_.size());
 }
 
 EyesOnGuysProblem Planner::compute_initial_problem_information(const std::vector<std::string>& guy_names) const

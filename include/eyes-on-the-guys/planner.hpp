@@ -9,6 +9,7 @@
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rcl_interfaces/msg/set_parameters_result.hpp>
 #include <rosplane_msgs/msg/state.hpp>
 #include <rosplane_msgs/msg/waypoint.hpp>
 
@@ -55,6 +56,16 @@ private:
   EyesOnGuysProblem problem_info_;
   rclcpp::Time time_of_last_visit_to_any_agent_;
 
+  // Variables for plotting
+  std::string mcts_name_;
+  std::vector<std::string> mcts_sequence_;
+  std::string bnb_name_;
+  std::vector<std::string> bnb_sequence_;
+  std::string fs_name_;
+  std::vector<std::string> fs_sequence_;
+  std::string seq_name_;
+  std::vector<std::string> seq_sequence_;
+
   // Callbacks
   void eyes_state_callback(const rosplane_msgs::msg::State & msg);
   void guy_pose_callback(const geometry_msgs::msg::PoseStamped & msg);
@@ -66,6 +77,9 @@ private:
   void select_new_target_guy();
   double compute_horizontal_distance_to_target();
   void plot_state();
+  void plot_sequence(const std::vector<std::string>& sequence,
+                     const std::string& line_style,
+                     const std::string& display_name);
 
   /**
    * @brief Computes the Dubins path length from current state to target position/heading.
@@ -87,6 +101,8 @@ private:
   float mo(float in);
 
   void declare_parameters();
+  OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
+  rcl_interfaces::msg::SetParametersResult parameters_callback(const std::vector<rclcpp::Parameter> & parameters);
 
   /**
   * Uses MCTS to compute the next guy to fly to
@@ -119,6 +135,8 @@ private:
   * @return nothing
   */
   void find_next_guy_sequentially(const std::vector<std::string>& guy_names);
+
+  void find_next_guy_using_all_methods(const std::vector<std::string>& guy_names);
 
   EyesOnGuysProblem compute_initial_problem_information(const std::vector<std::string>& guy_names) const;
 
