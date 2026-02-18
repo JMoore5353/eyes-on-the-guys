@@ -40,6 +40,26 @@ EyesOnGuysProblem EyesOnGuysProblem::create_child_eyes_on_guys_state(const int c
   return new_problem;
 }
 
+void EyesOnGuysProblem::update_relay_information(const int curr_state, const double new_total_bits)
+{
+  relays_current_info[curr_state] = new_total_bits;
+  shared_info_matrix.row(curr_state) = relays_current_info;
+  shared_info_matrix(curr_state, curr_state) = 0;
+}
+
+void EyesOnGuysProblem::update_time_since_last_visit(const int curr_state, const double dt)
+{
+  for (int i = 0; i < relays_current_info.size(); ++i) {
+    time_since_last_relay_contact_with_agent[i] += dt;
+  }
+  time_since_last_relay_contact_with_agent[curr_state] = 0.0;
+}
+
+void EyesOnGuysProblem::update_distance_matrix(const Eigen::MatrixXd & dists)
+{
+  distance_between_agents = dists;
+}
+
 double simulate_agent_info_gain(const double time_since_last_visit)
 {
   // TODO: (PREDICTIVE_MODEL) Replace this placeholder with the information-gain model.

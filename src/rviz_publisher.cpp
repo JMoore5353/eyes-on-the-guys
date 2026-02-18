@@ -47,9 +47,9 @@ void RvizPublisher::add_new_marker_to_guy_vector(const std::string & name)
   new_marker.id = 0;
   new_marker.type = visualization_msgs::msg::Marker::MESH_RESOURCE;
   new_marker.action = visualization_msgs::msg::Marker::ADD;
-  new_marker.scale.x = 0.05;
-  new_marker.scale.y = 0.05;
-  new_marker.scale.z = 0.05;
+  new_marker.scale.x = 0.5;
+  new_marker.scale.y = 0.5;
+  new_marker.scale.z = -0.5;
   new_marker.color.r = 0.0f;
   new_marker.color.g = 0.46f;
   new_marker.color.b = 0.93f;

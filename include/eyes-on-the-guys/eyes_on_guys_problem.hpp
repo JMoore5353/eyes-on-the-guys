@@ -18,7 +18,12 @@ public:
   double relay_speed;
   Eigen::MatrixXd distance_between_agents; // nxn where n is num of agents
 
+  inline int num_agents() const { return relays_current_info.size(); };
+
   EyesOnGuysProblem create_child_eyes_on_guys_state(const int curr_state, const int action);
+  void update_relay_information(const int curr_state, const double new_total_bits);
+  void update_time_since_last_visit(const int curr_state, const double dt);
+  void update_distance_matrix(const Eigen::MatrixXd & dists);
 };
 
 double simulate_agent_info_gain(const double time_since_last_visit);

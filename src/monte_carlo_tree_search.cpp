@@ -33,7 +33,7 @@ int MonteCarloTreeSearch::search_for_best_action(const int initial_state, const 
   for (int i = 0; i < num_iter; ++i) {
     simulate(initial_node_, depth, discount_factor, lookahead_depth, lookahead_iters);
   }
-  return find_greedy_action(initial_node_);
+  return initial_node_->get_greedy_action();
 }
 
 double MonteCarloTreeSearch::simulate(std::shared_ptr<MCTSNode> curr_state, const int depth,
@@ -74,7 +74,7 @@ std::vector<int> MonteCarloTreeSearch::get_greedy_sequence(bool print_info_matri
   std::vector<int> out;
   std::shared_ptr<const MCTSNode> curr_node = initial_node_;
   while (curr_node != nullptr) {
-    int best_action = find_greedy_action(curr_node);
+    int best_action = curr_node->get_greedy_action();
     curr_node = curr_node->get_child(best_action);
     if (curr_node != nullptr) {
       out.push_back(best_action);
@@ -131,23 +131,20 @@ int lookahead_get_random_action(const int curr_state, const int num_states)
 std::shared_ptr<MCTSNode> transition_from_state(std::shared_ptr<MCTSNode> curr_node,
                                                 const int action)
 {
+  // Transition model (deterministic)
   return curr_node->take_action(action);
 }
 
 double compute_reward_from_transitioning(const std::shared_ptr<const MCTSNode> curr_state,
                                          const std::shared_ptr<const MCTSNode> next_state)
 {
+  // Reward model
   int curr_state_id{curr_state->get_id()};
   int next_state_id{next_state->get_id()};
   const EyesOnGuysProblem & curr_state_problem_info{curr_state->get_ref_to_problem_info()};
   const EyesOnGuysProblem & next_state_problem_info{next_state->get_ref_to_problem_info()};
   return compute_reward_model(curr_state_id, next_state_id, curr_state_problem_info,
                               next_state_problem_info);
-}
-
-int find_greedy_action(const std::shared_ptr<const MCTSNode> curr_state)
-{
-  return curr_state->get_greedy_action();
 }
 
 } // namespace eyes_on_guys

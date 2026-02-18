@@ -13,6 +13,7 @@ find_package(rclcpp REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(rosplane_msgs REQUIRED)
 find_package(Eigen3 3.3 REQUIRED NO_MODULE)
@@ -85,6 +86,8 @@ if(Matplot++_FOUND)
 else()
   target_link_libraries(planner matplot)
 endif()
+target_link_libraries(planner monte_carlo_tree_search forward_search_solver "${cpp_typesupport_target}")
+
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
   TARGETS planner
@@ -115,11 +118,27 @@ target_include_directories(monte_carlo_tree_search
     include/eyes-on-the-guys)
 target_link_libraries(monte_carlo_tree_search PUBLIC Eigen3::Eigen)
 
+###############
+##  SOLVERS  ##
+###############
+
+add_library(forward_search_solver
+  src/forward_search_solver.cpp)
+target_include_directories(forward_search_solver
+  PUBLIC
+    include/eyes-on-the-guys)
+target_link_libraries(forward_search_solver Eigen3::Eigen)
+ament_target_dependencies(forward_search_solver geometry_msgs Eigen3)
+install(
+  TARGETS forward_search_solver
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ###################
 ##   RESOURCES   ##
 ###################
 install(
-  DIRECTORY resource launch
+  DIRECTORY resource launch params
   DESTINATION share/${PROJECT_NAME}
 )
 
@@ -139,8 +158,12 @@ if(BUILD_TESTING)
     test/monte_carlo_node_test.cpp
     test/monte_carlo_tree_search_test.cpp
     test/eyes_on_guys_problem_test.cpp
-    test/branch_and_bound_solver_test.cpp)
-    #test/pruning_comparison_test.cpp)
+    test/branch_and_bound_solver_test.cpp
+    #test/pruning_comparison_test.cpp
+    test/forward_search_solver_test.cpp
+    test/planner_test.cpp
+    src/planner.cpp
+  )
   target_include_directories(unit_tests
     PRIVATE
       ${GTEST_INCLUDE_DIRS})
@@ -148,7 +171,15 @@ if(BUILD_TESTING)
     GTest::GTest
     GTest::Main
     monte_carlo_tree_search
+    forward_search_solver
+    "${cpp_typesupport_target}"
   )
+  if(Matplot++_FOUND)
+    target_link_libraries(unit_tests Matplot++::matplot)
+  else()
+    target_link_libraries(unit_tests matplot)
+  endif()
+  ament_target_dependencies(unit_tests rclcpp geometry_msgs rosplane_msgs Eigen3)
 endif()
 
 ament_package()

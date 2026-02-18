@@ -99,13 +99,39 @@ TEST(find_best_action, GivenQWithOneZero_ExpectReturnsCorrectAction)
   EXPECT_EQ(result, correct_action);
 }
 
-TEST(get_greedy_action, GivenQWithOneZeroValue_ExpectReturnsCorrectAction)
+TEST(get_greedy_action, GivenQWithOneHighValue_ExpectReturnsCorrectAction)
 {
   Eigen::Matrix<double, 12, 1> Q_s_a = Eigen::Matrix<double, 12, 1>::Ones();
   int correct_action{4};
+  int node_id{2};
   Q_s_a(correct_action) = 1000;
 
-  int result = eyes_on_guys::find_max_q_value(Q_s_a);
+  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a);
+
+  EXPECT_EQ(result, correct_action);
+}
+
+TEST(get_greedy_action, GivenNegativeQValues_ExpectReturnsCorrectAction)
+{
+  Eigen::Matrix<double, 12, 1> Q_s_a = -1000 * Eigen::Matrix<double, 12, 1>::Ones();
+  int correct_action{3};
+  int node_id{4};
+  Q_s_a(correct_action) = -100;
+
+  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a);
+
+  EXPECT_EQ(result, correct_action);
+}
+
+TEST(get_greedy_action, GivenHighestQOnSelfAction_ExpectDoesNotReturnSelf)
+{
+  Eigen::Matrix<double, 12, 1> Q_s_a = Eigen::Matrix<double, 12, 1>::Ones();
+  int correct_action{3};
+  int node_id{4};
+  Q_s_a(node_id) = 1000;
+  Q_s_a(correct_action) = 500;
+
+  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a);
 
   EXPECT_EQ(result, correct_action);
 }

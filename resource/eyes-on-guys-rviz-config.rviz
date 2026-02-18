@@ -57,7 +57,9 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        {}
+        text: true
+        wp: true
+        wp_path: true
       Topic:
         Depth: 20
         Durability Policy: Transient Local
@@ -103,11 +105,14 @@ Visualization Manager:
       Enabled: true
       Name: Marker
       Namespaces:
-        brandon: true
-        ian: true
-        jacob: true
+        Euler: true
+        Gauss: true
+        Laplace: true
+        Nyquist: true
+        Pythagoras: true
+        Ramanujan: true
       Topic:
-        Depth: 5
+        Depth: 10
         Durability Policy: Volatile
         Filter size: 10
         History Policy: Keep Last
@@ -266,5 +271,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1720
-  X: 1720
-  Y: 0
+  X: 536
+  Y: 36

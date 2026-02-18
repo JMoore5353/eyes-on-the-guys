@@ -9,16 +9,6 @@
 namespace eyes_on_guys
 {
 
-TEST(find_greedy_action, WhenFindingGreedyAction_ExpectTheNodesGreedyAction)
-{
-  auto node = std::make_shared<MCTSNode>(0, 10, 1.0);
-  int node_greedy_action = node->get_greedy_action();
-
-  int greedy_action = find_greedy_action(node);
-
-  EXPECT_EQ(greedy_action, node_greedy_action);
-}
-
 TEST(transition_from_state, WhenTransitioning_ExpectTransitionIsDeterministic)
 {
   auto node = std::make_shared<MCTSNode>(0, 10, 1.0);
@@ -265,6 +255,90 @@ TEST_F(MCTSThreeAgentTestTwo, GivenManyLookaheadIters_WhenTakingAction_ExpectOpt
 
   EXPECT_EQ(action, optimal_action);
   EXPECT_EQ(greedy_seq, optimal_greedy_seq);
+}
+
+class MCTSActualProblem : public ::testing::Test
+{
+public:
+  MCTSActualProblem()
+      : num_agents{6}
+      , initial_state{0}
+      , num_iter{100}
+      , depth{7}
+      , discount_factor{0.9}
+      , exploration_bonus{100.0}
+      , relay_speed{15.0}
+      , problem_info{num_agents, relay_speed, dist_between_agents}
+      , lookahead_depth{0}
+      , lookahead_iters{0}
+  {
+    Eigen::Matrix<double, 6,6> dist_between_agents;
+    dist_between_agents <<
+            0, 536.669, 260.261, 437.994, 141.305, 115.668
+      ,536.669,       0, 276.562, 99.0206, 395.931, 421.336
+      ,260.261, 276.562,       0, 178.291,  120.54, 145.473
+      ,437.994, 99.0206, 178.291,       0, 297.063, 322.526
+      ,141.305, 395.931,  120.54, 297.063,       0, 25.6663
+      ,115.668, 421.336, 145.473, 322.526, 25.6663,       0;
+    problem_info.distance_between_agents = dist_between_agents;
+  }
+
+protected:
+  int num_agents;
+  int initial_state;
+  int num_iter;
+  int depth;
+  double discount_factor;
+  double exploration_bonus;
+  double relay_speed;
+  Eigen::Matrix3d dist_between_agents;
+  EyesOnGuysProblem problem_info;
+  int lookahead_depth;
+  int lookahead_iters;
+  int optimal_action;
+  std::vector<int> optimal_greedy_seq;
+};
+
+class MCTSActualProblemTestOne : public MCTSActualProblem
+{
+public:
+  MCTSActualProblemTestOne() {
+    initial_state = 1;
+  }
+};
+
+TEST_F(MCTSActualProblem, ExpectOptimalActionIsNotSelf)
+{
+  MonteCarloTreeSearch tree_searcher{num_agents};
+  int optimal_action = tree_searcher.search_for_best_action(initial_state,
+                                                            num_iter,
+                                                            depth,
+                                                            discount_factor,
+                                                            exploration_bonus,
+                                                            problem_info,
+                                                            lookahead_depth,
+                                                            lookahead_iters);
+  std::vector<int> greedy_sequence = tree_searcher.get_greedy_sequence();
+
+  EXPECT_NE(optimal_action, initial_state);
+  EXPECT_NE(greedy_sequence, std::vector<int>());
+}
+
+TEST_F(MCTSActualProblemTestOne, ExpectOptimalActionIsNotSelf)
+{
+  MonteCarloTreeSearch tree_searcher{num_agents};
+  int optimal_action = tree_searcher.search_for_best_action(initial_state,
+                                                            num_iter,
+                                                            depth,
+                                                            discount_factor,
+                                                            exploration_bonus,
+                                                            problem_info,
+                                                            lookahead_depth,
+                                                            lookahead_iters);
+  std::vector<int> greedy_sequence = tree_searcher.get_greedy_sequence();
+
+  EXPECT_NE(optimal_action, initial_state);
+  EXPECT_NE(greedy_sequence, std::vector<int>());
 }
 
 } // namespace eyes_on_guys
