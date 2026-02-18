@@ -73,7 +73,7 @@ double compute_reward_model(const int curr_state, const int next_state,
                             const bool include_penalties)
 {
   double gamma{1.0};
-  double beta{0.05};
+  double beta{0.1};
 
   // Mathematically equivalent to ||curr_state.relay_info - curr_state.shared_info_matrix.row(action)||_2
   // with action information set to 0. Not setting action to 0 adds an additional incentive to
