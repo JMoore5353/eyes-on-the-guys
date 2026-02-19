@@ -4,7 +4,13 @@
 
 ## How To Run 
 
-BRANDON INSTRUCTIONS GO HERE?
+The only dependency is [Podman](https://podman.io/docs/installation#ubuntu) or [Docker](https://docs.docker.com/engine/install/ubuntu/).
+Although Docker is more well known, Podman is more secure as it runs in user-space and not root-space like Docker.
+Podman also has a much simpler installation process, so we recommend using Podman.
+
+To run the sim, just run the `build-and-run.sh` bash script.
+This will build the included Dockerfile and then run it with the permissions and configuration necessary to display GUIs.
+This will take some time, so please be patient (a few minutes to build, about 30 seconds to start flying once the visualizer has loaded).
 
 ## Problem Setup
 The eyes on the guys (EOTG) problem is a search and rescue problem.
