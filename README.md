@@ -1,6 +1,7 @@
 # Eyes On The Guys
 
-<!-- Sizzle Video here? -->
+https://github.com/user-attachments/assets/9d24bc4f-419d-4aaa-8c04-d8ae6eea8c84
+
 
 ## How To Run 
 
@@ -89,7 +90,7 @@ We then rely on the fact that the actual reward function is penalized, unlike ou
 
 ### Expected Behavior
 
-<!-- Screenshot of RViz and MPPP -->
+<img width="1118" height="1034" alt="live_plots" src="https://github.com/user-attachments/assets/77be526f-3dfd-44ab-a080-b10b7b259909" />
 
 When running this repo you will see a UAV in a simulation environment take off and fly toward one of the searchers. 
 A plot will update dynamically comparing the suggested sequence of agents to visit by each solution.
