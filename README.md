@@ -97,7 +97,10 @@ When running this repo you will see a UAV in a simulation environment take off a
 A plot will update dynamically comparing the suggested sequence of agents to visit by each solution.
 In the simulation environment you will see green lines between each agent as the proposed solution given by MCTS.
 There will be a number above each agent which indicates the order to visit the searchers starting with 0 up to $d$.
-The relay agent will continue to visit the agents periodically until the program is canceled.
+The relay agent will continue to visit the agents periodically until the program is cancelled.
+
+The relay agent only plans a new sequence for each solution type when it reaches a new agent.
+The dynamic plots draw a line from the agent's current position to the next suggested searcher despite travelling to a different agent.
 
 ### Analysis
 Below we present the results of running the solution methods on the same system.
