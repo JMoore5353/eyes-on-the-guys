@@ -32,15 +32,16 @@ Each method used the same reward function, transition model and scaling paramete
 The comparison helped us to explore the trade-offs of optimality and speed.
 
 ### State and Reward Function
-The state of the system is the position of the relay agent $\boldsymbol{p}_r$ , the system's shared information matrix $I(s)$ at state $s$, the position of the searchers $\boldsymbol{p}_i | \forall i \in [0,n]$ and time since last visit to the searchers $t_i$.
+The state of the system is the position of the relay agent $\boldsymbol{p}_r$ , the system's shared information matrix $I(s)$ at state $s$, the position of the searchers $\boldsymbol{p}_i | \forall i \in [0,n]$ and time since last visit to each searcher $t_i$.
 
 The reward function is as follows,
 
-$$ R(s\prime, a) = \lVert{I(s\prime) - I(s)}\rVert_F - \ell (s\prime) - \sum_{i=0}^n t_i $$
+$$ R(s, a) = \lVert{I(s\prime) - I(s)}\rVert_F - \ell (s\prime) - \sum_{i=0}^n t_i $$
 
 where $\ell(s\prime)$ is the length to the proposed searcher from the current searcher.
 
 Upon the relay agent getting to the next searcher, it updates the shared information, distances to adjoining agents and time since visiting each agent.
+It then uses one of the online planning methods to determine its next action.
 
 ### Transition Model
 The transition model is taken to be deterministic, meaning the probability of going to the intended state is 1.
