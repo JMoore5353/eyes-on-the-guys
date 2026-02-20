@@ -26,6 +26,10 @@ public:
   // Returns an empty vector when inputs/configuration are invalid or no valid path is found.
   std::vector<int> solve(int initial_state, const EyesOnGuysProblem & problem_info);
 
+  // Returns the best total discounted reward found by the last solve() call.
+  // Returns std::numeric_limits<double>::lowest() if no complete path was found.
+  double get_best_reward() const { return best_reward_; }
+
 private:
   // Give unit tests access to private members
   FRIEND_TEST(BranchAndBoundTest, OrderingsAreCorrect_Qmax);

@@ -119,8 +119,8 @@ double compute_reward_model(const int curr_state, const int next_state,
     // This is mostly redundant with the distance penalty.
 
     Eigen::VectorXd delta_time_since_last_contact =
-      next_state_info.time_since_last_relay_contact_with_agent
-      - curr_state_info.time_since_last_relay_contact_with_agent;
+      next_state_info.time_since_last_relay_contact_with_agent;
+      // - curr_state_info.time_since_last_relay_contact_with_agent;
     double time_since_last_visit_penalty = delta_time_since_last_contact.sum() * zeta;
 
     return shared_info_reward - distance_penalty - time_since_last_visit_penalty;

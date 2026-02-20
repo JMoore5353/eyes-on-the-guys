@@ -83,25 +83,6 @@ private:
                      const std::string& line_style,
                      const std::string& display_name);
 
-  /**
-   * @brief Computes the Dubins path length from current state to target position/heading.
-   *        Uses the same algorithm as rosplane's path_manager_dubins_fillets.
-   *
-   * @param start_n Start north position (m)
-   * @param start_e Start east position (m)
-   * @param start_chi Start course angle (rad)
-   * @param end_n End north position (m)
-   * @param end_e End east position (m)
-   * @param end_chi End course angle (rad)
-   * @return Path length in meters, or -1.0 if path is infeasible
-   */
-  double compute_dubins_path_length(float start_n, float start_e, float start_chi,
-                                    float end_n, float end_e, float end_chi);
-
-  // Dubins path helper functions
-  Eigen::Matrix3f rotz(float theta);
-  float mo(float in);
-
   void declare_parameters();
   OnSetParametersCallbackHandle::SharedPtr parameter_callback_handle_;
   rcl_interfaces::msg::SetParametersResult parameters_callback(const std::vector<rclcpp::Parameter> & parameters);

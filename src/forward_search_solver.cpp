@@ -246,7 +246,7 @@ ForwardSearchSolver::State ForwardSearchSolver::make_initial_state(
   state.relay_info(starting_index) =
     guy_states_by_id_.at(ids_.at(static_cast<size_t>(starting_index))).bits;
 
-  state.relay_time_since_visit = Eigen::VectorXd::Constant(size, 1'000.0);
+  state.relay_time_since_visit = Eigen::VectorXd::Constant(size, 0.0);
   state.relay_time_since_visit(starting_index) = 0.0;
 
   state.guy_bits = Eigen::VectorXd::Zero(size);

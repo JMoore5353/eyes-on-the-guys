@@ -34,11 +34,11 @@ public:
     int depth = 6;
     int num_rollouts = 20;
     int roll_out_depth = 5;
-    double discount_factor = 0.5;
+    double discount_factor = 0.9;
     double agent_velocity = 17.0;
-    double info_shared_weight = 10.0;
-    double path_length_weight = 1.0;
-    double time_since_visit_weight = 10.0;
+    double info_shared_weight = 1.0;
+    double path_length_weight = 0.1;
+    double time_since_visit_weight = 1.0;
     int starting_guy = 0;
     Eigen::MatrixXd shared_info_matrix;
   };

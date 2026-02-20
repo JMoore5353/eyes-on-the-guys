@@ -1,6 +1,9 @@
 #include <chrono>
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <string>
 #include <Eigen/Core>
-#include <matplot/matplot.h>
 
 #include "branch_and_bound_solver.hpp"
 #include "eyes_on_guys_problem.hpp"
@@ -39,104 +42,156 @@ std::pair<double, double> run_mcts(const int num_agents,
   return {solve_time, reward};
 }
 
-// std::pair<std::vector<int>, double> run_bnb()
-// {
-//   int num_agents = static_cast<int>(guy_names.size());
-//   std::vector<std::string>::const_iterator it = std::find(guy_names.begin(), guy_names.end(), current_target_guy_);
-//   int initial_state = std::distance(guy_names.begin(), it);
-//
-//   BranchAndBoundSolver bnb_solver{num_agents,
-//                                   (int)this->get_parameter("bnb_max_depth").as_int(),
-//                                   (int)this->get_parameter("bnb_max_iterations").as_int(),
-//                                   this->get_parameter("bnb_discount_factor").as_double(),
-//                                   this->get_parameter("bnb_debug_mode").as_bool(),
-//                                   this->get_parameter("bnb_enable_pruning").as_bool()};
-//   std::vector<int> optimal_sequence = bnb_solver.solve(initial_state, problem_info_);
-//
-//   current_target_guy_ = guy_names.at(optimal_sequence.at(0));
-//   current_target_sequence_.clear();
-//   int64_t depth = std::min(this->get_parameter("bnb_plan_depth").as_int(), (int64_t)optimal_sequence.size());
-//   for (int64_t i=0; i<depth; ++i) {
-//     int idx = optimal_sequence.at(i);
-//     current_target_sequence_.push_back(guy_names.at(idx));
-//   }
-// }
-//
-// std::pair<std::vector<int>, double> run_forward_search()
-// {
-//   const int starting_guy = find_starting_guy_index(guy_names, current_target_guy_);
-//   const ForwardSearchSolver::ForwardSearchInput input = make_forward_search_input(
-//     guy_names,
-//     guy_poses_,
-//     problem_info_);
-//   const ForwardSearchSolver::ForwardSearchConfig config = make_forward_search_config(
-//     *this,
-//     starting_guy,
-//     problem_info_.shared_info_matrix);
-//
-//   RCLCPP_INFO_STREAM(
-//     this->get_logger(),
-//     "Forward search input guy_names.size(): " << guy_names.size());
-//   RCLCPP_INFO_STREAM(
-//     this->get_logger(),
-//     "Forward search config depth passed to solver: " << config.depth);
-//
-//   ForwardSearchSolver solver;
-//   const auto solve_start = std::chrono::steady_clock::now();
-//   const ForwardSearchSolver::ForwardSearchResult result = solver.solve(input, config);
-//   const auto solve_end = std::chrono::steady_clock::now();
-//   const double solve_elapsed_sec =
-//     std::chrono::duration<double>(solve_end - solve_start).count();
-//   RCLCPP_INFO_STREAM(
-//     this->get_logger(),
-//     "Forward search solve() elapsed seconds: " << solve_elapsed_sec);
-//   if (!result.success || result.sequence_ids.empty()) {
-//     throw std::runtime_error("Forward search failed to produce a sequence: " + result.message);
-//   }
-//
-//   std::ostringstream sequence_stream;
-//   for (size_t i = 0; i < result.sequence_ids.size(); ++i) {
-//     if (i > 0) {
-//       sequence_stream << " -> ";
-//     }
-//     sequence_stream << result.sequence_ids.at(i);
-//   }
-//   RCLCPP_INFO_STREAM(
-//     this->get_logger(),
-//     "Forward search optimal sequence (len=" << result.sequence_ids.size() << "): "
-//       << sequence_stream.str());
-//
-//   current_target_guy_ = result.sequence_ids.at(0);
-//   current_target_sequence_ = result.sequence_ids;
-//
-//   RCLCPP_INFO_STREAM(this->get_logger(), "FORWARD NEXT: " << current_target_guy_);
-// }
+// BnB uses max_iterations as a safety cap; with pruning enabled it often completes well
+// before the limit for moderate depths.  discount_factor is matched to MCTS.
+std::pair<double, double> run_bnb(const int num_agents,
+                                  const int initial_state,
+                                  const int depth,
+                                  const double discount_factor,
+                                  const EyesOnGuysProblem & problem_info,
+                                  const int max_iterations = 100000)
+{
+  BranchAndBoundSolver solver{num_agents, depth, max_iterations, discount_factor};
+
+  auto start_time = std::chrono::high_resolution_clock::now();
+  solver.solve(initial_state, problem_info);
+  auto end_time = std::chrono::high_resolution_clock::now();
+
+  double solve_time =
+    std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+  double reward = solver.get_best_reward();
+
+  return {solve_time, reward};
+}
+
+// Forward search uses its own reward function (shared_info_matrix norm, not delta norm), so
+// rewards are not directly comparable to MCTS/BnB.  Structural parameters are matched:
+//   depth, discount_factor, agent_velocity == relay_speed, rollout_depth, rollout_iters.
+std::pair<double, double> run_fs(const int initial_state,
+                                 const int depth,
+                                 const double discount_factor,
+                                 const double agent_velocity,
+                                 const int rollout_depth,
+                                 const int rollout_iters,
+                                 const ForwardSearchSolver::ForwardSearchInput & input)
+{
+  ForwardSearchSolver solver;
+  ForwardSearchSolver::ForwardSearchConfig config;
+  config.depth = depth;
+  config.discount_factor = discount_factor;
+  config.agent_velocity = agent_velocity;
+  config.roll_out_depth = rollout_depth;
+  config.num_rollouts = rollout_iters;
+  config.starting_guy = initial_state;
+  config.shared_info_matrix = input.shared_info_matrix;
+
+  auto start_time = std::chrono::high_resolution_clock::now();
+  const ForwardSearchSolver::ForwardSearchResult result = solver.solve(input, config);
+  auto end_time = std::chrono::high_resolution_clock::now();
+
+  double solve_time =
+    std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+  double reward =
+    result.success ? result.total_value : std::numeric_limits<double>::quiet_NaN();
+
+  return {solve_time, reward};
+}
 
 } // namespace eyes_on_guys
 
 int main(int argc, char ** argv)
 {
+  // ── Shared experiment parameters ──────────────────────────────────────────
   const int num_agents{6};
-  int initial_state{0};
-  int mcts_num_iter{125};
-  int mcts_depth{20};
-  double mcts_discount_factor{0.9};
-  double mcts_exploration_bonus{100};
-  double relay_speed{10};
-  auto dist_between_guys = 100 * Eigen::Matrix<double, num_agents, num_agents>::Random();
-  eyes_on_guys::EyesOnGuysProblem problem_info{num_agents, relay_speed, dist_between_guys};
-  int mcts_lookahead_depth{5};
-  int mcts_lookahead_iters{30};
-  std::pair<double, double> mcts_result = eyes_on_guys::run_mcts(num_agents,
-                                                    initial_state,
-                                                    mcts_num_iter,
-                                                    mcts_depth,
-                                                    mcts_discount_factor,
-                                                    mcts_exploration_bonus,
-                                                    problem_info,
-                                                    mcts_lookahead_depth,
-                                                    mcts_lookahead_iters);
+  const int initial_state{0};
+  const double discount_factor{0.9};
+  const double relay_speed{10.0};    // m/s — used as agent_velocity for ForwardSearch too
+  const int rollout_depth{5};        // MCTS lookahead_depth == FS roll_out_depth
+  const int rollout_iters{30};       // MCTS lookahead_iters  == FS num_rollouts
+  const double mcts_exploration_bonus{100.0};
+  const int mcts_num_iter{500};
+  const int bnb_max_iterations{100000};
+  const int num_trials{5};
+  const int depth_min{4};
+  const int depth_max{15};
 
-  std::cout << "MCTS: R: " << mcts_result.second << " T: " << mcts_result.first << std::endl;
+  // ── Consistent geometry: generate 2D positions, derive distance matrix ────
+  // All three solvers will see the same inter-agent distances.
+  // ForwardSearch computes distances internally from poses; MCTS/BnB receive the
+  // matrix directly.  Using srand(42) ensures reproducibility.
+  srand(42);
+  Eigen::MatrixXd positions = 500.0 * Eigen::MatrixXd::Random(num_agents, 2);
+
+  Eigen::MatrixXd dist_between_guys = Eigen::MatrixXd::Zero(num_agents, num_agents);
+  for (int i = 0; i < num_agents; ++i) {
+    for (int j = 0; j < num_agents; ++j) {
+      if (i != j) {
+        dist_between_guys(i, j) = (positions.row(i) - positions.row(j)).norm();
+        dist_between_guys(j, i) = dist_between_guys(i, j);
+      }
+    }
+  }
+
+  eyes_on_guys::EyesOnGuysProblem problem_info{num_agents, relay_speed, dist_between_guys};
+
+  // Build ForwardSearch input from the same positions
+  eyes_on_guys::ForwardSearchSolver::ForwardSearchInput fs_input;
+  fs_input.ids.reserve(num_agents);
+  fs_input.shared_info_matrix = Eigen::MatrixXd::Zero(num_agents, num_agents);
+  for (int i = 0; i < num_agents; ++i) {
+    const std::string id = std::to_string(i);
+    fs_input.ids.push_back(id);
+    eyes_on_guys::ForwardSearchSolver::GuyState state;
+    state.pose.pose.position.x = positions(i, 0);
+    state.pose.pose.position.y = positions(i, 1);
+    state.pose.pose.position.z = 0.0;
+    fs_input.guy_states_by_id[id] = state;
+  }
+
+  // ── Output CSV ─────────────────────────────────────────────────────────────
+  // Note: MCTS/BnB rewards use compute_reward_model (delta shared_info norm);
+  //       ForwardSearch uses its own reward function (full shared_info norm).
+  //       Rewards across algorithms are not directly comparable.
+  const std::string output_path = (argc > 1) ? argv[1] : "timing_and_reward_results.csv";
+  std::ofstream csv(output_path);
+  if (!csv.is_open()) {
+    std::cerr << "Failed to open output file: " << output_path << std::endl;
+    return 1;
+  }
+  csv << "algorithm,depth,trial,time_ms,reward\n";
+
+  for (int depth = depth_min; depth <= depth_max; ++depth) {
+    for (int trial = 0; trial < num_trials; ++trial) {
+
+      auto [mcts_t, mcts_r] = eyes_on_guys::run_mcts(
+        num_agents, initial_state, mcts_num_iter, depth,
+        discount_factor, mcts_exploration_bonus, problem_info,
+        rollout_depth, rollout_iters);
+      csv << "mcts," << depth << "," << trial << "," << mcts_t << "," << mcts_r << "\n";
+
+      auto [bnb_t, bnb_r] = eyes_on_guys::run_bnb(
+        num_agents, initial_state, depth, discount_factor, problem_info, bnb_max_iterations);
+      csv << "bnb," << depth << "," << trial << "," << bnb_t << "," << bnb_r << "\n";
+
+      std::cout << "depth=" << depth << " trial=" << trial
+                << "  mcts: t=" << mcts_t << "ms r=" << mcts_r
+                << "  bnb:  t=" << bnb_t  << "ms r=" << bnb_r;
+
+      if (depth <= 6) {
+        auto [fs_t, fs_r] = eyes_on_guys::run_fs(
+          initial_state, depth, discount_factor, relay_speed,
+          rollout_depth, rollout_iters, fs_input);
+        csv << "fs," << depth << "," << trial << "," << fs_t << "," << fs_r << "\n";
+
+        std::cout << "  fs:   t=" << fs_t   << "ms r=" << fs_r << std::endl;
+      } else {
+        std::cout << std::endl;
+      }
+
+    }
+  }
+
+  csv.close();
+  std::cout << "Results saved to: " << output_path << std::endl;
   return 0;
 }
