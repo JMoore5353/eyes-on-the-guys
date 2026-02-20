@@ -32,13 +32,13 @@ Each method used the same reward function, transition model and scaling paramete
 The comparison helped us to explore the trade-offs of optimality and speed.
 
 ### State and Reward Function
-The state of the system is the position of the relay agent $\boldsymbol{p}_r$ , the system's shared information matrix $I$, the position of the searchers $\boldsymbol{p}_i | \forall i \in [0,n]$ and time since last visit to the searchers $t_i$.
+The state of the system is the position of the relay agent $\boldsymbol{p}_r$ , the system's shared information matrix $I(s)$ at state $s$, the position of the searchers $\boldsymbol{p}_i | \forall i \in [0,n]$ and time since last visit to the searchers $t_i$.
 
 The reward function is as follows,
 
-$$ R(s') = \lVert{I}\rVert_F - l(s') - \sum_{i=0}^n t_i $$
+$$ R(s\prime, a) = \lVert{I(s\prime) - I(s)}\rVert_F - \ell (s\prime) - \sum_{i=0}^n t_i $$
 
-where $l(s')$ is the length to the proposed searcher from the current searcher.
+where $\ell(s\prime)$ is the length to the proposed searcher from the current searcher.
 
 Upon the relay agent getting to the next searcher, it updates the shared information, distances to adjoining agents and time since visiting each agent.
 
@@ -85,6 +85,22 @@ Hence, a 'longest sequential path' is a reasonable approximation of the non-pena
 We then rely on the fact that the actual reward function is penalized, unlike our bound, to ensure we do not prune too many good solutions.
 
 ### Monte Carlo Tree Search
+Monte Carlo Tree Search (MCTS) attempts to approximate the optimal policy by balancing between exploitation and exploration of the search tree.
+It is useful in sequential problems because
+
+1. You can set a fixed number of simulations to run (limiting runtime) and
+2. You can balance between exploration of unvisited states and selection of the best actions.
+
+When arriving at an unvisited state, MCTS estimates the value of that state using rollouts.
+Because MCTS relies heavily on rollouts, these value estimates can have high variance.
+The number of rollouts done at each unvisited state can be increased to reduce this variance, but this incurs additional solve time.
+
+#### MCTS Implementation details
+
+* For the exploration/exploitation metric, we used the Upper Confidence Bound-1 metric from the book, which is
+  $$Q(s,a) + c \sqrt{\frac{\log N(s)}{N(s, a)}}$$
+* We typically used 30 rollouts with a depth of 5 to estimate the value function at a new state
+* We ran 5000 simulations for each planning step
 
 ## Expected Behavior and Analysis
 
@@ -95,11 +111,14 @@ We then rely on the fact that the actual reward function is penalized, unlike ou
 When running this repo you will see a UAV in a simulation environment take off and fly toward one of the searchers. 
 A plot will update dynamically comparing the suggested sequence of agents to visit by each solution.
 In the simulation environment you will see green lines between each agent as the proposed solution given by MCTS.
-There will be a number above each agent which indicates the order to visit the searchers starting with 0 up to $d$.
-The relay agent will continue to visit the agents periodically until the program is cancelled.
+The relay agent will continue to visit the agents until the program is cancelled.
+
+Since each planner type produces a different solution (in general), we had to choose one method to use to actually control the UAV.
+The planner selects the action taken by MCTS, so the solutions returned by the other 3 methods are unused.
 
 The relay agent only plans a new sequence for each solution type when it reaches a new agent.
-The dynamic plots draw a line from the agent's current position to the next suggested searcher despite travelling to a different agent.
+The dynamic plots draw a line from the agent's current position to the next suggested searcher.
+Note that for the methods not actually used by the planner (everything but MCTS), the UAV won't fly to the next suggested searcher.
 
 ### Analysis
 Below we present the results of running the solution methods on the same system.
