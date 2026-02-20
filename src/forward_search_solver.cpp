@@ -159,7 +159,9 @@ double ForwardSearchSolver::reward_function(
   const double lambda = current_config_.path_length_weight;
   const double xi = current_config_.time_since_visit_weight;
 
-  double info_matrix_reward = (state.relay_info.transpose() - state.shared_info_matrix.row(next_index)).norm();
+  Eigen::VectorXd info_matrix_delta = state.relay_info.transpose() - state.shared_info_matrix.row(next_index);
+  info_matrix_delta[next_index] = 0;
+  double info_matrix_reward = info_matrix_delta.norm();
 
   const double summed_time_since_last_visit = xi * state.relay_time_since_visit.sum();
   return beta * info_matrix_reward - lambda * path_length - summed_time_since_last_visit;
