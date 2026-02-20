@@ -91,6 +91,8 @@ It is useful in sequential problems because
 1. You can set a fixed number of simulations to run (limiting runtime) and
 2. You can balance between exploration of unvisited states and selection of the best actions.
 
+We chose to implement MCTS to examine the difference between more optimal but time-intensive solutions (forward search, branch and bound) and this approximate method.
+
 When arriving at an unvisited state, MCTS estimates the value of that state using rollouts.
 Because MCTS relies heavily on rollouts, these value estimates can have high variance.
 The number of rollouts done at each unvisited state can be increased to reduce this variance, but this incurs additional solve time.
@@ -108,7 +110,11 @@ The number of rollouts done at each unvisited state can be increased to reduce t
 
 <img width="1118" height="1034" alt="live_plots" src="https://github.com/user-attachments/assets/77be526f-3dfd-44ab-a080-b10b7b259909" />
 
-When running this repo you will see a UAV in a simulation environment take off and fly toward one of the searchers. 
+When running this repo you will see a UAV in a simulation environment take off and fly toward one of the searchers.
+This UAV is using [ROSplane](https://github.com/rosflight/rosplane) as the autopilot.
+We modified the stock autopilot's path planner to use our search algorithms.
+Thus, our modified planner produces waypoints, which ROSplane uses to do line following and airspeed/course control, etc.
+
 A plot will update dynamically comparing the suggested sequence of agents to visit by each solution.
 In the simulation environment you will see green lines between each agent as the proposed solution given by MCTS.
 The relay agent will continue to visit the agents until the program is cancelled.
@@ -121,7 +127,33 @@ The dynamic plots draw a line from the agent's current position to the next sugg
 Note that for the methods not actually used by the planner (everything but MCTS), the UAV won't fly to the next suggested searcher.
 
 ### Analysis
-Below we present the results of running the solution methods on the same system.
+Below we present the results of running the solution methods on a test system.
 We compare the runtime versus depth and reward versus depth.
 
-<!-- Plots!!!!!!!! -->
+To do this, we instantiated a random problem (random distances between agents) and ran each algorithm at various depths.
+We recorded the runtime of each algorithm and the estimated reward from taking the best action from the initial state.
+
+At each depth, each algorithm was run 5 times, and the times/rewards for those 5 runs were averaged together.
+A plot of depth vs time and depth vs reward is shown below.
+
+<img width="1300" height="500" alt="reward_and_timing_tests" src="https://github.com/user-attachments/assets/14a5cd89-f6ab-4262-85a2-03c23c18d747" />
+
+These plots clearly demonstrate tradeoffs between the methods we presented.
+While forward search produces optimal results for a given depth (good), the time complexity grows exponentially (bad).
+
+Branch and bound mitigates the exponential time growth, but still grows exponentially.
+This could be improved with further tuning of the upper bound.
+
+MCTS shows relatively constant solve times (since we are running the same number of simulations at each depth), but is less optimal than the others.
+Thus, if you are on a strict time budget, MCTS is a good option.
+
+> [!NOTE]
+> Note that the reward decreases as the depth increases since our reward function heavily penalizes path length and visit times to each agent.
+
+> [!IMPORTANT]
+> Since forward search is theoretically optimal for a given depth, we would expect the branch and bound to produce similar rewards (if it is returning the optimal solution).
+> However, the depth vs. reward plot shows branch and bound with *higher* reward than the forward search.
+> 
+> This could be due to the fact that we are not running any lookahead rollouts in branch and bound, which makes it more difficult to directly compare the reward outputs.
+> Rollouts effectively increase the depth of the search, and we see a downward trend in reward as depth increases.
+> This is likely why the forward search has a lower reward than branch and bound for a given depth.
