@@ -111,7 +111,7 @@ int main(int argc, char ** argv)
   const double mcts_exploration_bonus{100.0};
   const int mcts_num_iter{500};
   const int bnb_max_iterations{100000};
-  const int num_trials{5};
+  const int num_trials{50};
   const int depth_min{4};
   const int depth_max{15};
 
@@ -171,7 +171,7 @@ int main(int argc, char ** argv)
       std::cout << "depth=" << depth << " trial=" << trial
                 << "  mcts: t=" << mcts_t << "ms r=" << mcts_r;
 
-      if (depth <= 9) {
+      if (depth <= 8) {
         auto [bnb_t, bnb_r] = eyes_on_guys::run_bnb(
           num_agents, initial_state, depth, discount_factor, problem_info, bnb_max_iterations);
         csv << "bnb," << depth << "," << trial << "," << bnb_t << "," << bnb_r << "\n";

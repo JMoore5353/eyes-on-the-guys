@@ -131,7 +131,7 @@ void Planner::declare_parameters()
   this->declare_parameter("mcts_exploration_bonus", 100.0);
   this->declare_parameter("mcts_lookahead_depth", 5);
   this->declare_parameter("mcts_lookahead_iters", 30);
-  this->declare_parameter("forward_search_depth", 6);
+  this->declare_parameter("forward_search_depth", 5);
   this->declare_parameter("forward_search_num_rollouts", 20);
   this->declare_parameter("forward_search_roll_out_depth", 5);
   this->declare_parameter("forward_search_discount_factor", 0.5);
@@ -139,8 +139,8 @@ void Planner::declare_parameters()
   this->declare_parameter("forward_search_info_shared_weight", 10.0);
   this->declare_parameter("forward_search_path_length_weight", 1.0);
   this->declare_parameter("forward_search_time_since_visit_weight", 10.0);
-  this->declare_parameter("bnb_plan_depth", 7);
-  this->declare_parameter("bnb_max_depth", 20);
+  this->declare_parameter("bnb_plan_depth", 5);
+  this->declare_parameter("bnb_max_depth", 5);
   this->declare_parameter("bnb_max_iterations", 100000);
   this->declare_parameter("bnb_discount_factor", 0.9);
   this->declare_parameter("bnb_debug_mode", false);
