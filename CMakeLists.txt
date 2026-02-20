@@ -86,7 +86,12 @@ if(Matplot++_FOUND)
 else()
   target_link_libraries(planner matplot)
 endif()
-target_link_libraries(planner monte_carlo_tree_search forward_search_solver "${cpp_typesupport_target}")
+target_link_libraries(planner
+  monte_carlo_tree_search
+  branch_and_bound_solver
+  forward_search_solver
+  "${cpp_typesupport_target}"
+)
 
 ament_target_dependencies(planner rclcpp geometry_msgs rosplane_msgs Eigen3)
 install(
@@ -105,22 +110,43 @@ install(
   DESTINATION lib/${PROJECT_NAME}
 )
 
+add_executable(timing_and_reward_comparison
+  test/timing_and_reward_comparison_test.cpp)
+target_link_libraries(timing_and_reward_comparison
+  monte_carlo_tree_search
+  forward_search_solver
+  branch_and_bound_solver)
+if(Matplot++_FOUND)
+  target_link_libraries(timing_and_reward_comparison Matplot++::matplot)
+else()
+  target_link_libraries(timing_and_reward_comparison matplot)
+endif()
+install(
+  TARGETS timing_and_reward_comparison
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ###################
 ##   LIBRARIES   ##
 ###################
 add_library(monte_carlo_tree_search
   src/eyes_on_guys_problem.cpp
   src/monte_carlo_node.cpp
-  src/monte_carlo_tree_search.cpp
-  src/branch_and_bound_solver.cpp)
+  src/monte_carlo_tree_search.cpp)
 target_include_directories(monte_carlo_tree_search
   PUBLIC
     include/eyes-on-the-guys)
 target_link_libraries(monte_carlo_tree_search PUBLIC Eigen3::Eigen)
 
-###############
-##  SOLVERS  ##
-###############
+add_library(branch_and_bound_solver
+  src/branch_and_bound_solver.cpp)
+target_include_directories(branch_and_bound_solver
+  PUBLIC
+    include/eyes-on-the-guys)
+target_link_libraries(branch_and_bound_solver
+  PUBLIC
+    Eigen3::Eigen
+    monte_carlo_tree_search)
 
 add_library(forward_search_solver
   src/forward_search_solver.cpp)
@@ -171,6 +197,7 @@ if(BUILD_TESTING)
     GTest::GTest
     GTest::Main
     monte_carlo_tree_search
+    branch_and_bound_solver
     forward_search_solver
     "${cpp_typesupport_target}"
   )

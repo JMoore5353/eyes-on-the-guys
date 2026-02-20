@@ -37,7 +37,8 @@ int MCTSNode::explore_best_action() const
   return find_best_action(id_, num_agents_, exploration_bonus_, N_s_a_, Q_s_a_);
 }
 
-int MCTSNode::get_greedy_action() const { return find_max_q_value(id_, Q_s_a_); }
+int MCTSNode::get_greedy_action() const { return find_max_q_value(id_, Q_s_a_).first; }
+double MCTSNode::get_greedy_reward() const { return find_max_q_value(id_, Q_s_a_).second; }
 
 bool MCTSNode::has_been_visited() const { return node_has_been_visited_; }
 void MCTSNode::visit_node() { node_has_been_visited_ = true; }
@@ -86,7 +87,7 @@ int find_best_action(const int id, const int num_agents, const double exploratio
   return best_action;
 }
 
-int find_max_q_value(const int node_id, const Eigen::VectorXd & Q_s_a)
+std::pair<int,double> find_max_q_value(const int node_id, const Eigen::VectorXd & Q_s_a)
 {
   double max_val{std::numeric_limits<double>::lowest()};
   int max_index = 0 ? (node_id != 0) : std::min(1, (int)Q_s_a.size());
@@ -102,7 +103,7 @@ int find_max_q_value(const int node_id, const Eigen::VectorXd & Q_s_a)
     }
   }
 
-  return max_index;
+  return {max_index, max_val};
 }
 
 double get_ucb1_bound(const int action, const double exploration_bonus,

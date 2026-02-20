@@ -106,7 +106,7 @@ TEST(get_greedy_action, GivenQWithOneHighValue_ExpectReturnsCorrectAction)
   int node_id{2};
   Q_s_a(correct_action) = 1000;
 
-  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a);
+  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a).first;
 
   EXPECT_EQ(result, correct_action);
 }
@@ -118,7 +118,7 @@ TEST(get_greedy_action, GivenNegativeQValues_ExpectReturnsCorrectAction)
   int node_id{4};
   Q_s_a(correct_action) = -100;
 
-  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a);
+  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a).first;
 
   EXPECT_EQ(result, correct_action);
 }
@@ -131,7 +131,7 @@ TEST(get_greedy_action, GivenHighestQOnSelfAction_ExpectDoesNotReturnSelf)
   Q_s_a(node_id) = 1000;
   Q_s_a(correct_action) = 500;
 
-  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a);
+  int result = eyes_on_guys::find_max_q_value(node_id, Q_s_a).first;
 
   EXPECT_EQ(result, correct_action);
 }

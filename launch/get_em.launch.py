@@ -59,6 +59,8 @@ def generate_launch_description():
             {
                 'use_sim_time': launch.substitutions.LaunchConfiguration('use_sim_time'),
                 "selection_algorithm": "all",
+                "mcts_depth": 20,
+                "mcts_num_iter": 5000,
             },
         ]
     )

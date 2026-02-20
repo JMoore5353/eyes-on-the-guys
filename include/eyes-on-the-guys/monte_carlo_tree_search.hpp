@@ -24,6 +24,7 @@ public:
   // TODO: Could you use this greedy sequence to get a bunch of the top options and compare to make sure that the
   // algorithm is returning the best option?
   std::vector<int> get_greedy_sequence(bool print_info_matrices = false) const;
+  double get_reward_of_greedy_action() const;
 
 private:
   int num_states_;

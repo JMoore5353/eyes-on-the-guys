@@ -89,6 +89,11 @@ std::vector<int> MonteCarloTreeSearch::get_greedy_sequence(bool print_info_matri
   return out;
 }
 
+double MonteCarloTreeSearch::get_reward_of_greedy_action() const
+{
+  return initial_node_->get_greedy_reward();
+}
+
 double lookahead_value_function_estimate(const std::shared_ptr<const MCTSNode> curr_state,
                                          const int num_states, const int depth,
                                          const double discount, const int num_iters)
