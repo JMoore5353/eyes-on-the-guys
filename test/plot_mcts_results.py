@@ -53,8 +53,8 @@ def plot_results(df: pd.DataFrame, output_dir: pathlib.Path) -> None:
         color = ALGO_COLORS.get(algo, None)
 
         axes[0].errorbar(
-            stats["depth"], stats["time_mean"],
-            yerr=stats["time_std"],
+            stats["depth"], stats["time_mean"] / 1000,
+            yerr=stats["time_std"] / 1000,
             label=label, color=color,
             marker="o", capsize=4, linewidth=1.5,
         )
@@ -67,7 +67,7 @@ def plot_results(df: pd.DataFrame, output_dir: pathlib.Path) -> None:
         )
 
     axes[0].set_xlabel("Search Depth")
-    axes[0].set_ylabel("Solve Time (ms)")
+    axes[0].set_ylabel("Solve Time (sec)")
     axes[0].set_title("Search Depth vs. Solve Time")
     axes[0].legend()
     axes[0].grid(True, linestyle="--", alpha=0.5)
@@ -75,8 +75,7 @@ def plot_results(df: pd.DataFrame, output_dir: pathlib.Path) -> None:
     axes[1].set_xlabel("Search Depth")
     axes[1].set_ylabel("Algorithm Reward")
     axes[1].set_title(
-        "Search Depth vs. Reward\n"
-        "(MCTS/BnB and ForwardSearch rewards are not directly comparable)"
+        "Search Depth vs. Reward"
     )
     axes[1].legend()
     axes[1].grid(True, linestyle="--", alpha=0.5)

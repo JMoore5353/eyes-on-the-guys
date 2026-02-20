@@ -168,14 +168,18 @@ int main(int argc, char ** argv)
         discount_factor, mcts_exploration_bonus, problem_info,
         rollout_depth, rollout_iters);
       csv << "mcts," << depth << "," << trial << "," << mcts_t << "," << mcts_r << "\n";
-
-      auto [bnb_t, bnb_r] = eyes_on_guys::run_bnb(
-        num_agents, initial_state, depth, discount_factor, problem_info, bnb_max_iterations);
-      csv << "bnb," << depth << "," << trial << "," << bnb_t << "," << bnb_r << "\n";
-
       std::cout << "depth=" << depth << " trial=" << trial
-                << "  mcts: t=" << mcts_t << "ms r=" << mcts_r
-                << "  bnb:  t=" << bnb_t  << "ms r=" << bnb_r;
+                << "  mcts: t=" << mcts_t << "ms r=" << mcts_r;
+
+      if (depth <= 9) {
+        auto [bnb_t, bnb_r] = eyes_on_guys::run_bnb(
+          num_agents, initial_state, depth, discount_factor, problem_info, bnb_max_iterations);
+        csv << "bnb," << depth << "," << trial << "," << bnb_t << "," << bnb_r << "\n";
+
+        std::cout << "  bnb:  t=" << bnb_t  << "ms r=" << bnb_r;
+      } else {
+        std::cout << std::endl;
+      }
 
       if (depth <= 6) {
         auto [fs_t, fs_r] = eyes_on_guys::run_fs(
