@@ -60,8 +60,7 @@ The number of agents affects the branching factor causing the runtime to explode
 Depth similarly affects runtime; these effects are analyzed in the analysis function.
 This method was used as a ground truth against which the other methods were compared.
 
-
-<!-- Diagram forward search -->
+<img width="1014" height="597" alt="Forward Search Eyes On The Guys" src="https://github.com/user-attachments/assets/ded11149-7d88-4f79-91e2-64d0ac2ad2d5" />
 
 ### Branch-and-Bound
 Branch-and-bound attempts to find the optimal solution while avoiding the necessity of searching over the entire state space.
