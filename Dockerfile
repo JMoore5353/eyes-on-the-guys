@@ -21,7 +21,7 @@ RUN . /opt/ros/jazzy/setup.sh \
 
 # Build workspace.
 RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build --symlink-install
+    && colcon build --symlink-install --executor sequential
 
 # Copy this repository into /rosflight_ws/src/eyes-on-the-guys.
 COPY . /rosflight_ws/src/eyes-on-the-guys
@@ -32,7 +32,7 @@ RUN . /opt/ros/jazzy/setup.sh \
     && rosdep update \
     && rosdep install --from-paths . -y --ignore-src
 RUN . /opt/ros/jazzy/setup.sh \
-    && colcon build --symlink-install
+    && colcon build --symlink-install --executor sequential
 
 # Internal launch script used as the container entrypoint.
 RUN cat <<'EOF' >/usr/local/bin/run-eyes-on-the-guys-sim.sh
