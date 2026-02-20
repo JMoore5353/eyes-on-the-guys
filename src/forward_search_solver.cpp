@@ -159,8 +159,10 @@ double ForwardSearchSolver::reward_function(
   const double lambda = current_config_.path_length_weight;
   const double xi = current_config_.time_since_visit_weight;
 
+  double info_matrix_reward = (state.relay_info.transpose() - state.shared_info_matrix.row(next_index)).norm();
+
   const double summed_time_since_last_visit = xi * state.relay_time_since_visit.sum();
-  return beta * state.shared_info_matrix.norm() - lambda * path_length - summed_time_since_last_visit;
+  return beta * info_matrix_reward - lambda * path_length - summed_time_since_last_visit;
 }
 
 double ForwardSearchSolver::calculate_path_length(
