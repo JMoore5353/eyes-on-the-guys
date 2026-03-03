@@ -14,6 +14,10 @@ To run the sim, just run the `build-and-run.sh` bash script.
 This will build the included Dockerfile and then run it with the permissions and configuration necessary to display GUIs.
 This will take some time, so please be patient (a few minutes to build, about 30 seconds to start flying once the visualizer has loaded).
 
+To clean up your system after building/running/evaluating the project, run `podman system reset` to clean up all podman files or run `docker system prune -a` to clean up all docker files.
+Podman is then uninstalled with `sudo apt purge podman`.
+To uninstall docker, refer to the [uninstallation section of the docs](https://docs.docker.com/engine/install/ubuntu/#uninstall-docker-engine).
+
 ## Problem Setup
 The eyes on the guys (EOTG) problem is a search and rescue problem.
 A group of $n$ searchers (guys) are exploring an environment and accumulating information.
